@@ -1,52 +1,42 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LinearRegression
+from sklearn.impute import SimpleImputer
 import joblib
-import os
 
-# -----------------------------
-# 1. LOAD DATA FROM DATABASE EXPORT OR CSV
-# -----------------------------
-df = pd.read_csv("Project survey.csv")  
-# later we can connect directly to PostgreSQL
+from data_processing.transform_survey import transform_survey_data
 
-# -----------------------------
-# 2. FEATURE ENGINEERING
-# -----------------------------
+# LOAD DATA
+df = transform_survey_data("Project survey.csv")
 
-# Encode study method (e.g., reading, group study, video)
-le = LabelEncoder()
-df["study_method"] = le.fit_transform(df["study_method"])
+# ENCODE study_method
+df["study_method"] = df["study_method"].map({
+    "Active": 1,
+    "Passive": 0
+})
 
-features = [
-    "study_hours",
-    "focus_score",
-    "study_method",
-    "unit",
-    "difficulty"
-]
+# DROP rows where target is missing
+df = df.dropna(subset=["points"])
 
-X = df[features]
-y = df["gpa"]
+# FEATURES
+X = df[["study_time", "difficulty", "study_method"]]
+y = df["points"]
 
-# -----------------------------
-# 3. TRAIN / TEST SPLIT
-# -----------------------------
+# HANDLE MISSING VALUES (IMPORTANT)
+imputer = SimpleImputer(strategy="mean")
+X = imputer.fit_transform(X)
+
+# TRAIN TEST SPLIT
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# -----------------------------
-# 4. MODEL TRAINING
-# -----------------------------
-model = RandomForestRegressor(n_estimators=100, random_state=42)
+# MODEL
+model = LinearRegression()
 model.fit(X_train, y_train)
 
-# -----------------------------
-# 5. SAVE MODEL
-# -----------------------------
-os.makedirs("ml", exist_ok=True)
+# SAVE MODEL + IMPUTER
 joblib.dump(model, "ml/model.pkl")
+joblib.dump(imputer, "ml/imputer.pkl")
 
-print("Model trained and saved successfully!")
+print("✅ Model trained and saved!")

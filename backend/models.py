@@ -20,6 +20,9 @@ class StudentProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
+    # 👇 ADD THIS (CRITICAL for survey linkage)
+    username = db.Column(db.String(255), nullable=True)
+
     student_id_code = db.Column(db.String(50), unique=True)
     department = db.Column(db.String(100))
     level = db.Column(db.Integer)
@@ -44,9 +47,12 @@ class Course(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     semester_id = db.Column(db.Integer, db.ForeignKey("semesters.id"), nullable=False)
 
-    course_code = db.Column(db.String(20), nullable=False)
-    unit = db.Column(db.Integer, nullable=False)
-    difficulty = db.Column(db.Integer)
+    # 👇 MATCHES YOUR CSV
+    course_code = db.Column(db.String(50), nullable=True)
+
+    # (optional for later ML)
+    unit = db.Column(db.Float, nullable=True)
+    difficulty = db.Column(db.Integer, nullable=True)
 
     study_habits = db.relationship("StudyHabit", backref="course", cascade="all, delete")
     performance = db.relationship("Performance", backref="course", uselist=False, cascade="all, delete")
@@ -72,6 +78,8 @@ class Performance(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey("courses.id"), nullable=False)
 
     grade = db.Column(db.String(2))
+
+    # 👇 IMPORTANT: this is actually "points" from your CSV
     gpa = db.Column(db.Float)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

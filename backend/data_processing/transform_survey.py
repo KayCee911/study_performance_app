@@ -1,56 +1,88 @@
 import pandas as pd
+import re
+
+def clean_study_time(value):
+    if pd.isna(value):
+        return None
+
+    value = str(value).lower()
+
+    # remove text noise
+    value = value.replace("hours", "").replace("hrs", "").replace("hr", "").strip()
+
+    # handle ranges like "4-5"
+    if "-" in value:
+        parts = value.split("-")
+        try:
+            nums = [float(p) for p in parts if p.strip().isdigit()]
+            if len(nums) == 2:
+                return sum(nums) / 2
+        except:
+            return None
+
+    # extract number
+    nums = re.findall(r"\d+", value)
+    return float(nums[0]) if nums else None
+
 
 def transform_survey_data(file_path):
     df = pd.read_csv(file_path)
-
-    # STEP 1: CLEAN COLUMN NAMES
     df.columns = df.columns.str.strip()
 
-    id_cols = ["Timestamp", "Username"]
+    records = []
 
-    course_rows = []
+    for _, row in df.iterrows():
+        username = row["Username"]
 
-    # STEP 2: LOOP THROUGH COURSES (1–10)
-    for i in range(1, 11):
+        for i in range(1, 11):
+            try:
+                course = row.get(f"1. Course {i} code")
+                grade = row.get(f"6. Course {i} Grade")
+                difficulty = row.get(f"3. Course {i} difficulty")
+                study_time = row.get(f"4. Study time for this course (hours per week)")
+                study_method = row.get(f"5. Study method for course {i}")
 
-        code_col = f"1. Course {i} code"
-        unit_col = f"2. Course {i} Unit (in figures)"
-        diff_col = f"3. Course {i} difficulty"
-        time_col = f"4. Study time for this course (hours per week)"
-        method_col = f"5. Study method for course {i}"
-        grade_col = f"6. Course {i} Grade"
+                # skip empty grades
+                if pd.isna(grade):
+                    continue
 
-        # skip if missing
-        if grade_col not in df.columns:
-            continue
+                grade = str(grade).strip().upper()
 
-        temp = df[id_cols + [
-            code_col, unit_col, diff_col,
-            time_col, method_col, grade_col
-        ]].copy()
+                grade_map = {"A":5,"B":4,"C":3,"D":2,"E":1,"F":0}
+                points = grade_map.get(grade)
 
-        temp = temp.rename(columns={
-            code_col: "course_code",
-            unit_col: "unit",
-            diff_col: "difficulty",
-            time_col: "study_time",
-            method_col: "study_method",
-            grade_col: "grade"
-        })
+                if points is None:
+                    continue
 
-        temp["course_no"] = i
+                # CLEAN difficulty
+                difficulty = pd.to_numeric(difficulty, errors="coerce")
 
-        course_rows.append(temp)
+                # CLEAN study_time
+                study_time = clean_study_time(study_time)
 
-    # STEP 3: COMBINE ALL COURSES
-    df_long = pd.concat(course_rows, ignore_index=True)
+                # CLEAN study_method
+                if pd.notna(study_method):
+                    study_method = str(study_method).strip().capitalize()
+                else:
+                    study_method = None
 
-    # STEP 4: CLEAN
-    df_long = df_long.dropna(subset=["grade"])
+                records.append({
+                    "username": username,
+                    "course": str(course).strip() if pd.notna(course) else None,
+                    "grade": grade,
+                    "points": points,
+                    "difficulty": difficulty,
+                    "study_time": study_time,
+                    "study_method": study_method
+                })
 
-    df_long["grade"] = df_long["grade"].astype(str).str.upper().str.strip()
+            except Exception as e:
+                print(f"Error processing course {i}:", e)
 
-    grade_map = {"A":5,"B":4,"C":3,"D":2,"E":1,"F":0}
-    df_long["points"] = df_long["grade"].map(grade_map)
+    df_clean = pd.DataFrame(records)
 
-    return df_long
+    print("\n=== TRANSFORMED DATA ===")
+    print(df_clean.head())
+    print("\nMissing values:\n", df_clean.isna().sum())
+
+    return df_clean
