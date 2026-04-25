@@ -1,27 +1,29 @@
 import pandas as pd
 import re
 
+
+def clean_numeric(value):
+    if pd.isna(value):
+        return None
+
+    nums = re.findall(r"\d+\.?\d*", str(value))
+    return float(nums[0]) if nums else None
+
+
 def clean_study_time(value):
     if pd.isna(value):
         return None
 
     value = str(value).lower()
-
-    # remove text noise
     value = value.replace("hours", "").replace("hrs", "").replace("hr", "").strip()
 
     # handle ranges like "4-5"
     if "-" in value:
-        parts = value.split("-")
-        try:
-            nums = [float(p) for p in parts if p.strip().isdigit()]
-            if len(nums) == 2:
-                return sum(nums) / 2
-        except:
-            return None
+        parts = re.findall(r"\d+\.?\d*", value)
+        if len(parts) >= 2:
+            return sum(map(float, parts)) / len(parts)
 
-    # extract number
-    nums = re.findall(r"\d+", value)
+    nums = re.findall(r"\d+\.?\d*", value)
     return float(nums[0]) if nums else None
 
 
@@ -32,48 +34,62 @@ def transform_survey_data(file_path):
     records = []
 
     for _, row in df.iterrows():
-        username = row["Username"]
+        username = row.get("Username")
+
+        if pd.isna(username):
+            continue
 
         for i in range(1, 11):
             try:
                 course = row.get(f"1. Course {i} code")
-                grade = row.get(f"6. Course {i} Grade")
+                unit = row.get(f"2. Course {i} Unit (in figures)")
                 difficulty = row.get(f"3. Course {i} difficulty")
                 study_time = row.get(f"4. Study time for this course (hours per week)")
                 study_method = row.get(f"5. Study method for course {i}")
+                grade = row.get(f"6. Course {i} Grade")
 
-                # skip empty grades
+                # skip invalid grade
                 if pd.isna(grade):
                     continue
 
                 grade = str(grade).strip().upper()
 
-                grade_map = {"A":5,"B":4,"C":3,"D":2,"E":1,"F":0}
+                grade_map = {"A":5, "B":4, "C":3, "D":2, "E":1, "F":0}
                 points = grade_map.get(grade)
 
                 if points is None:
                     continue
 
-                # CLEAN difficulty
-                difficulty = pd.to_numeric(difficulty, errors="coerce")
+                # ---------- CLEAN VALUES ----------
+                unit = clean_numeric(unit)
+                if unit is None:
+                    unit = 3
 
-                # CLEAN study_time
+                difficulty = clean_numeric(difficulty)
+                if difficulty is None:
+                    difficulty = 3
+
                 study_time = clean_study_time(study_time)
+                if study_time is None:
+                    study_time = 0
 
-                # CLEAN study_method
                 if pd.notna(study_method):
                     study_method = str(study_method).strip().capitalize()
+                    if study_method not in ["Active", "Passive"]:
+                        study_method = "Passive"
                 else:
-                    study_method = None
+                    study_method = "Passive"
 
+                # ---------- RECORD ----------
                 records.append({
-                    "username": username,
-                    "course": str(course).strip() if pd.notna(course) else None,
+                    "username": str(username).strip().lower(),
+                    "course": str(course).strip() if pd.notna(course) else "UNKNOWN",
+                    "unit": float(unit),
+                    "difficulty": float(difficulty),
+                    "study_time": float(study_time),
+                    "study_method": study_method,
                     "grade": grade,
-                    "points": points,
-                    "difficulty": difficulty,
-                    "study_time": study_time,
-                    "study_method": study_method
+                    "points": float(points)
                 })
 
             except Exception as e:
@@ -81,8 +97,7 @@ def transform_survey_data(file_path):
 
     df_clean = pd.DataFrame(records)
 
-    print("\n=== TRANSFORMED DATA ===")
+    print("\n=== TRANSFORMED DATA SAMPLE ===")
     print(df_clean.head())
-    print("\nMissing values:\n", df_clean.isna().sum())
 
     return df_clean

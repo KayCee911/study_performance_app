@@ -2,9 +2,8 @@ import pandas as pd
 
 from flask import Blueprint, request, jsonify
 from data_processing.transform_survey import transform_survey_data
-from models import db, User, Semester, Course, StudyHabit, Performance
+from models import db, User, Semester, Course, StudyHabit, Performance, StudentProfile
 from ml.model_loader import predict_gpa
-from app import model, imputer
 
 survey_bp = Blueprint("survey", __name__)
 
@@ -14,7 +13,6 @@ def upload_survey():
 
     print("FILES:", request.files)
 
-    # ✅ FILE VALIDATION
     if "file" not in request.files:
         return jsonify({"error": "No file part in request"}), 400
 
@@ -23,21 +21,16 @@ def upload_survey():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # ✅ SAVE TEMP FILE
     file_path = "temp.csv"
     file.save(file_path)
 
-    # ✅ TRANSFORM DATA
     df = transform_survey_data(file_path)
 
-    # ✅ CLEAN DATA (CRITICAL)
     df = df.dropna(subset=["grade", "points"])
-    df = df[df["grade"].astype(str).str.lower() != "nan"]
 
-    # ✅ PROCESS USERS
     for username, group in df.groupby("username"):
 
-        # GET OR CREATE USER
+        # ---------- USER ----------
         user = User.query.filter_by(email=username).first()
 
         if not user:
@@ -45,7 +38,19 @@ def upload_survey():
             db.session.add(user)
             db.session.flush()
 
-        # CREATE SEMESTER
+        # ---------- PROFILE ----------
+        profile = StudentProfile.query.filter_by(user_id=user.id).first()
+
+        if not profile:
+            profile = StudentProfile(
+                user_id=user.id,
+                student_id_code=username.split("@")[0],
+                department="Unknown",
+                level=400
+            )
+            db.session.add(profile)
+
+        # ---------- SEMESTER ----------
         semester = Semester(
             user_id=user.id,
             name="Survey Semester"
@@ -53,36 +58,42 @@ def upload_survey():
         db.session.add(semester)
         db.session.flush()
 
-        # PROCESS COURSES
+        # ---------- COURSES ----------
         for _, row in group.iterrows():
 
-            # EXTRA SAFETY
-            if pd.isna(row["grade"]) or pd.isna(row["points"]):
-                continue
+            # SAFE VALUES (NO row.get!)
+            course_code = row["course"]
+            unit = int(row["unit"])
+            difficulty = int(row["difficulty"])
+            study_hours = float(row["study_time"])
+            study_method = str(row["study_method"])
+            grade = str(row["grade"])
+            gpa = float(row["points"])
 
             # COURSE
             course = Course(
                 semester_id=semester.id,
-                course_code=str(row["course"]).strip(),
-                unit=3,                 # placeholder for now
-                difficulty=row.get("difficulty")         # not yet extracted
+                course_code=course_code,
+                unit=unit,
+                difficulty=difficulty
             )
             db.session.add(course)
             db.session.flush()
 
-            # STUDY HABIT (currently unavailable → None)
+            # STUDY HABIT
             habit = StudyHabit(
                 course_id=course.id,
-                study_hours=row.get("study_time"),
-                study_method=row.get("study_method")
+                study_hours=study_hours,
+                study_method=study_method,
+                focus_score=None
             )
             db.session.add(habit)
 
             # PERFORMANCE
             performance = Performance(
                 course_id=course.id,
-                grade=str(row["grade"]).strip(),
-                gpa=float(row["points"])
+                grade=grade,
+                gpa=gpa
             )
             db.session.add(performance)
 
@@ -110,13 +121,13 @@ def get_user_courses(email):
     for semester in user.semesters:
         for course in semester.courses:
 
-            performance = course.performance
+            perf = course.performance
             habit = course.study_habits[0] if course.study_habits else None
 
             result.append({
                 "course_code": course.course_code,
-                "grade": performance.grade if performance else None,
-                "gpa": performance.gpa if performance else None,
+                "grade": perf.grade if perf else None,
+                "gpa": perf.gpa if perf else None,
                 "study_hours": habit.study_hours if habit else None,
                 "study_method": habit.study_method if habit else None
             })
@@ -135,135 +146,122 @@ def get_user_gpa(email):
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    total_points = 0
-    total_courses = 0
+    total = 0
+    count = 0
 
-    for semester in user.semesters:
-        for course in semester.courses:
-
-            if course.performance and course.performance.gpa is not None:
-                total_points += course.performance.gpa
-                total_courses += 1
-
-    if total_courses == 0:
-        return jsonify({"gpa": 0})
-
-    gpa = total_points / total_courses
+    for sem in user.semesters:
+        for course in sem.courses:
+            if course.performance:
+                total += course.performance.gpa
+                count += 1
 
     return jsonify({
         "email": email,
-        "gpa": round(gpa, 2)
+        "gpa": round(total / count, 2) if count else 0
     })
 
 
 # ===============================
-# ANALYTICS
+# INSIGHTS
 # ===============================
-@survey_bp.route("/analytics/difficulty-vs-gpa", methods=["GET"])
-def difficulty_vs_gpa():
+@survey_bp.route("/user/<email>/insights", methods=["GET"])
+def user_insights(email):
+
+    user = User.query.filter_by(email=email).first()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    gpas, hours, diffs = [], [], []
+
+    for sem in user.semesters:
+        for c in sem.courses:
+
+            if c.performance:
+                gpas.append(c.performance.gpa)
+
+            if c.difficulty is not None:
+                diffs.append(c.difficulty)
+
+            if c.study_habits:
+                h = c.study_habits[0].study_hours
+                if h is not None:
+                    hours.append(h)
+
+    return jsonify({
+        "avg_gpa": round(sum(gpas)/len(gpas), 2) if gpas else 0,
+        "avg_study_hours": round(sum(hours)/len(hours), 2) if hours else 0,
+        "avg_difficulty": round(sum(diffs)/len(diffs), 2) if diffs else 0,
+        "total_courses": len(gpas)
+    })
+
+
+# ===============================
+# RECOMMENDATIONS
+# ===============================
+@survey_bp.route("/recommendations/<email>", methods=["GET"])
+def recommendations(email):
+
+    user = User.query.filter_by(email=email).first()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    recs = set()
+
+    for sem in user.semesters:
+        for c in sem.courses:
+
+            perf = c.performance
+            habit = c.study_habits[0] if c.study_habits else None
+
+            if not perf or not habit:
+                continue
+
+            if perf.gpa < 3 and habit.study_hours < 3:
+                recs.add(f"Increase study time for {c.course_code}")
+
+            if perf.gpa < 3 and habit.study_method == "Passive":
+                recs.add(f"Use Active study method for {c.course_code}")
+
+            if c.difficulty >= 4:
+                recs.add(f"{c.course_code} is difficult, allocate more time")
+
+    return jsonify({"recommendations": list(recs)})
+
+from ml.recommender import recommend
+
+@survey_bp.route("/ml-recommend/<email>", methods=["GET"])
+def ml_recommend(email):
+
+    user = User.query.filter_by(email=email).first()
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
     results = []
 
-    courses = Course.query.all()
+    for semester in user.semesters:
+        for course in semester.courses:
 
-    for course in courses:
-        if course.performance and course.difficulty is not None:
+            perf = course.performance
+            habit = course.study_habits[0] if course.study_habits else None
+
+            if not perf or not habit:
+                continue
+
+            rec = recommend(
+                habit.study_hours or 0,
+                course.difficulty or 0,
+                habit.study_method or "Unknown",
+                course.unit or 3
+            )
 
             results.append({
-                "difficulty": course.difficulty,
-                "gpa": course.performance.gpa
+                "course": course.course_code,
+                "current_gpa": rec["current_gpa"],
+                "improved_gpa": rec["improved_gpa"],
+                "suggestion": rec["suggestion"]
             })
 
     return jsonify(results)
-
-
-@survey_bp.route("/analytics/studytime-vs-gpa", methods=["GET"])
-def studytime_vs_gpa():
-
-    results = []
-
-    habits = StudyHabit.query.all()
-
-    for habit in habits:
-        if habit.study_hours is not None and habit.course.performance:
-
-            results.append({
-                "study_hours": habit.study_hours,
-                "gpa": habit.course.performance.gpa
-            })
-
-    return jsonify(results)
-
-
-@survey_bp.route("/predict-gpa", methods=["POST"])
-def predict():
-
-    data = request.get_json()
-
-    study_hours = data.get("study_hours")
-    difficulty = data.get("difficulty")
-    study_method = data.get("study_method")
-
-    # VALIDATION
-    if study_hours is None or difficulty is None or study_method is None:
-        return jsonify({"error": "Missing fields"}), 400
-
-    try:
-        prediction = predict_gpa(
-            float(study_hours),
-            float(difficulty),
-            study_method
-        )
-
-        return jsonify({
-            "predicted_gpa": round(prediction, 2)
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
-
-
-@survey_bp.route("/predict", methods=["POST"])
-def predict_gpa():
-
-    data = request.get_json()
-
-    try:
-        study_hours = data.get("study_hours")
-        difficulty = data.get("difficulty")
-        study_method = data.get("study_method")
-
-        # 🔹 VALIDATION
-        if study_hours is None or difficulty is None or study_method is None:
-            return jsonify({"error": "Missing fields"}), 400
-
-        # 🔹 CLEAN INPUT (same logic as training)
-        study_hours = float(study_hours)
-        difficulty = float(difficulty)
-
-        study_method_map = {
-            "Active": 1,
-            "Passive": 0
-        }
-
-        study_method = study_method_map.get(study_method)
-
-        if study_method is None:
-            return jsonify({"error": "Invalid study_method"}), 400
-
-        # 🔹 PREPARE INPUT
-        X = [[study_hours, difficulty, study_method]]
-
-        # 🔹 APPLY IMPUTER
-        X = imputer.transform(X)
-
-        # 🔹 PREDICT
-        prediction = model.predict(X)[0]
-
-        return jsonify({
-            "predicted_gpa": round(float(prediction), 2)
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500

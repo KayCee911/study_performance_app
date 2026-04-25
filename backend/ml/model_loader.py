@@ -1,20 +1,23 @@
 import joblib
 
 model = joblib.load("ml/model.pkl")
+imputer = joblib.load("ml/imputer.pkl")
+
 
 def predict_gpa(study_hours, difficulty, study_method):
-
-    method_map = {
+    study_method_map = {
         "Active": 1,
         "Passive": 0
     }
 
-    method_encoded = method_map.get(study_method, 0)
+    study_method = study_method_map.get(study_method)
 
-    prediction = model.predict([[
-        study_hours,
-        difficulty,
-        method_encoded
-    ]])
+    if study_method is None:
+        raise ValueError("Invalid study method")
 
-    return float(prediction[0])
+    X = [[study_hours, difficulty, study_method]]
+    X = imputer.transform(X)
+
+    prediction = model.predict(X)[0]
+
+    return float(prediction)
