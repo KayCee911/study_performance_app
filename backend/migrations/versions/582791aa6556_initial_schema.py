@@ -1,8 +1,8 @@
-"""fresh schema
+"""initial schema
 
-Revision ID: 3ef6af694df4
+Revision ID: 582791aa6556
 Revises: 
-Create Date: 2026-04-22 15:26:24.480678
+Create Date: 2026-04-30 16:19:21.667547
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '3ef6af694df4'
+revision = '582791aa6556'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,11 +21,14 @@ def upgrade():
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('email', sa.String(length=120), nullable=False),
-    sa.Column('password', sa.String(length=200), nullable=False),
+    sa.Column('password_hash', sa.String(length=256), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=True),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('email')
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
     )
+    with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
+
     op.create_table('semesters',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -36,6 +39,7 @@ def upgrade():
     op.create_table('student_profiles',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('username', sa.String(length=255), nullable=True),
     sa.Column('student_id_code', sa.String(length=50), nullable=True),
     sa.Column('department', sa.String(length=100), nullable=True),
     sa.Column('level', sa.Integer(), nullable=True),
@@ -44,11 +48,14 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('student_id_code')
     )
+    with op.batch_alter_table('student_profiles', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_student_profiles_username'), ['username'], unique=False)
+
     op.create_table('courses',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('semester_id', sa.Integer(), nullable=False),
-    sa.Column('course_code', sa.String(length=20), nullable=False),
-    sa.Column('unit', sa.Integer(), nullable=False),
+    sa.Column('course_code', sa.String(length=50), nullable=True),
+    sa.Column('unit', sa.Float(), nullable=True),
     sa.Column('difficulty', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['semester_id'], ['semesters.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -80,7 +87,13 @@ def downgrade():
     op.drop_table('study_habits')
     op.drop_table('performances')
     op.drop_table('courses')
+    with op.batch_alter_table('student_profiles', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_student_profiles_username'))
+
     op.drop_table('student_profiles')
     op.drop_table('semesters')
+    with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_users_email'))
+
     op.drop_table('users')
     # ### end Alembic commands ###

@@ -2,8 +2,8 @@ from flask import Blueprint, request, jsonify, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from models import db, User
-from utils.token import generate_token, confirm_token
-from utils.email import send_email 
+from utils.tokens import generate_token, confirm_token
+from backend.utils.validators import send_email 
 
 auth = Blueprint('auth', __name__)
 
