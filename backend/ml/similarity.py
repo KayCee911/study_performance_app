@@ -1,29 +1,20 @@
-import joblib
 import pandas as pd
-
-MODEL_PATH = "ml/kmeans.pkl"
-SCALER_PATH = "ml/kmeans_scaler.pkl"
-DATA_PATH = "ml/student_clusters.csv"
+from ml.clustering import get_similar_students as cluster_similar
+from data_processing.transform_survey import transform_survey_data
 
 
 def get_similar_students(email):
 
     try:
-        model = joblib.load(MODEL_PATH)
-        scaler = joblib.load(SCALER_PATH)
-        df = pd.read_csv(DATA_PATH)
-    except:
-        print("⚠️ No clustering file found — skipping peer insights")
-        return None
+        # 🔥 ALWAYS USE PROCESSED DATA
+        df = transform_survey_data("temp.csv")
 
-    user_row = df[df["email"] == email]
+        if df.empty:
+            print("Dataset is empty after transformation")
+            return pd.DataFrame()
 
-    if user_row.empty:
-        return None
+        return cluster_similar(email, df)
 
-    cluster_id = user_row.iloc[0]["cluster"]
-
-    # return only same cluster students
-    peers = df[df["cluster"] == cluster_id]
-
-    return peers
+    except Exception as e:
+        print("Clustering error:", e)
+        return pd.DataFrame()

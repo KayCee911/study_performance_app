@@ -171,7 +171,9 @@ class Performance(db.Model):
 
     grade = db.Column(db.String(2))
 
-    # 🔥 This is "points" from CSV
+    
     gpa = db.Column(db.Float)
+
+    predicted_gpa = db.Column(db.Float)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

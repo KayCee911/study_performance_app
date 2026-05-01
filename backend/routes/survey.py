@@ -5,6 +5,7 @@ from data_processing.transform_survey import transform_survey_data
 from models import db, User, Semester, Course, StudyHabit, Performance, StudentProfile
 from ml.recommender_engine import optimize_recommendation, generate_ai_summary
 from ml.similarity import get_similar_students
+from ml.evaluate import evaluate_model
 
 survey_bp = Blueprint("survey", __name__)
 
@@ -211,7 +212,7 @@ def user_insights(email):
 
 
 # ===============================
-# ML RECOMMENDER (FINAL)
+# ML RECOMMENDER 
 # ===============================
 @survey_bp.route("/ml-recommend/<email>", methods=["GET"])
 def ml_recommend(email):
@@ -222,19 +223,40 @@ def ml_recommend(email):
 
     results = []
 
+    # =========================
+    # CLUSTERING 
+    # =========================
     similar_students = get_similar_students(email)
 
-    peer_avg = None
+    peer_message = "No peer data available yet"
+
     if isinstance(similar_students, pd.DataFrame) and not similar_students.empty:
-        if "points" in similar_students.columns:
-            peer_avg = None
-            peer_hours = None
 
-            if isinstance(similar_students, pd.DataFrame) and not similar_students.empty:
+        if "avg_gpa" in similar_students.columns:
 
-                peer_avg = round(similar_students["avg_gpa"].mean(), 2)
-                peer_hours = round(similar_students["avg_hours"].mean(), 2)
+            peer_avg = round(similar_students["avg_gpa"].mean(), 2)
+            peer_hours = round(similar_students["avg_hours"].mean(), 2)
 
+            user_row = similar_students[
+            similar_students["username"] == email.lower()
+        ]
+
+            rank_text = ""
+
+            if not user_row.empty and "rank" in similar_students.columns:
+                user_rank = int(user_row.iloc[0]["rank"])
+                total = len(similar_students)
+
+                rank_text = f" You rank {user_rank}/{total} in your peer group."
+
+            peer_message = (
+            f"Students like you study ~{peer_hours} hrs "
+            f"and average GPA {peer_avg}.{rank_text}"
+        )
+
+    # =========================
+    # COURSE LOOP
+    # =========================
     for sem in user.semesters:
         for c in sem.courses:
 
@@ -264,10 +286,7 @@ def ml_recommend(email):
                 "suggestion": suggestion,
                 "confidence": rec.get("confidence", 0),
                 "why": rec.get("explanations", []),
-                "peer_insight": (
-                    f"Students like you avg GPA: {peer_avg}"
-                    if peer_avg is not None else None
-                )
+                "peer_insight": peer_message
             })
 
     summary = generate_ai_summary(results)
@@ -276,3 +295,16 @@ def ml_recommend(email):
         "results": results,
         "summary": summary
     })
+
+
+@survey_bp.route("/evaluate-model", methods=["GET"])
+def evaluate():
+
+    file_path = "temp.csv"
+
+    df = transform_survey_data(file_path)
+    df = df.dropna(subset=["points"])
+
+    metrics = evaluate_model(df)
+
+    return jsonify(metrics)

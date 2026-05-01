@@ -1,82 +1,86 @@
 import pandas as pd
-import joblib
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-from models import db, User
-
-MODEL_PATH = "ml/kmeans.pkl"
-SCALER_PATH = "ml/kmeans_scaler.pkl"
+from sklearn.cluster import KMeans
 
 
-# ============================
-# BUILD DATASET (FROM DB)
-# ============================
-def build_student_dataset():
+# =========================
+# BUILD FEATURES
+# =========================
+def build_cluster_features(df):
 
-    data = []
+    required_cols = ["username", "study_time", "difficulty", "points", "unit"]
 
-    users = User.query.all()
+    for col in required_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing column: {col}")
 
-    for user in users:
+    # Aggregate per student
+    features = df.groupby("username").agg({
+        "study_time": "mean",
+        "difficulty": "mean",
+        "points": "mean",
+        "unit": "mean"
+    }).reset_index()
 
-        gpas, hours, diffs, methods = [], [], [], []
+    features.rename(columns={
+        "study_time": "avg_hours",
+        "difficulty": "avg_difficulty",
+        "points": "avg_gpa",
+        "unit": "avg_unit"
+    }, inplace=True)
 
-        for sem in user.semesters:
-            for c in sem.courses:
-
-                if c.performance and c.performance.gpa is not None:
-                    gpas.append(c.performance.gpa)
-
-                if c.difficulty is not None:
-                    diffs.append(c.difficulty)
-
-                if c.study_habits:
-                    h = c.study_habits[0]
-
-                    if h.study_hours is not None:
-                        hours.append(h.study_hours)
-
-                    if h.study_method:
-                        methods.append(
-                            1 if str(h.study_method).lower() == "active" else 0
-                        )
-
-        if not gpas:
-            continue
-
-        data.append({
-            "email": user.email,
-            "avg_gpa": sum(gpas)/len(gpas),
-            "avg_hours": sum(hours)/len(hours) if hours else 0,
-            "avg_difficulty": sum(diffs)/len(diffs) if diffs else 0,
-            "active_ratio": sum(methods)/len(methods) if methods else 0
-        })
-
-    return pd.DataFrame(data)
+    return features
 
 
-# ============================
+# =========================
 # TRAIN CLUSTER MODEL
-# ============================
-def train_clustering(k=3):
+# =========================
+def train_clustering(df, k=3):
 
-    df = build_student_dataset()
+    features = build_cluster_features(df)
 
-    if df.empty:
-        print("No data for clustering")
-        return
-
-    X = df[["avg_gpa", "avg_hours", "avg_difficulty", "active_ratio"]]
+    X = features.drop(columns=["username"])
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    model = KMeans(n_clusters=k, random_state=42)
-    df["cluster"] = model.fit_predict(X_scaled)
+    model = KMeans(n_clusters=k, random_state=42, n_init=10)
+    features["cluster"] = model.fit_predict(X_scaled)
 
-    joblib.dump(model, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
+    return features, model, scaler
 
-    df.to_csv("ml/student_clusters.csv", index=False)
 
-    print("Clustering trained successfully")
+# =========================
+# GET SIMILAR STUDENTS
+# =========================
+def get_similar_students(email, df): 
+
+    try:
+        features, model, scaler = train_clustering(df)
+
+        # Normalize email (important)
+        email = str(email).strip().lower()
+
+        user_row = features[features["username"] == email]
+
+        if user_row.empty:
+            return pd.DataFrame()
+
+        user_cluster = user_row.iloc[0]["cluster"]
+
+        similar = features[features["cluster"] == user_cluster].copy()
+
+        # =========================
+        # 🔥 ADD RANKING HERE
+        # =========================
+        if "avg_gpa" in similar.columns:
+            similar["rank"] = similar["avg_gpa"].rank(
+                ascending=False,
+                method="dense"
+            )
+
+        return similar
+
+    except Exception as e:
+        print("Clustering error:", e)
+        return pd.DataFrame()
