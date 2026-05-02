@@ -4,6 +4,10 @@ from config import Config
 from extensions import db, mail, migrate
 from routes.survey import survey_bp
 from routes.auth import auth_bp
+from ml.retrain import retrain_model
+
+
+
 
 
 def create_app():
@@ -26,8 +30,15 @@ def create_app():
     @app.route("/dashboard")
     def dashboard():
         return render_template("dashboard.html")
+    
+   
+
+    with app.app_context():
+        retrain_model()
 
     return app
+
+    
 
 
 app = create_app()

@@ -6,6 +6,9 @@ from models import db, User, Semester, Course, StudyHabit, Performance, StudentP
 from ml.recommender_engine import optimize_recommendation, generate_ai_summary
 from ml.similarity import get_similar_students
 from ml.evaluate import evaluate_model
+from ml.retrain import retrain_model
+from ml.auto_retrain import should_retrain
+from math import sqrt
 
 survey_bp = Blueprint("survey", __name__)
 
@@ -32,15 +35,13 @@ def upload_survey():
 
     for username, group in df.groupby("username"):
 
-        # ---------- USER ----------
         user = User.query.filter_by(email=username).first()
         if not user:
-            user = User(email=username) 
+            user = User(email=username)
             user.set_password("temp123")
             db.session.add(user)
             db.session.flush()
 
-        # ---------- PROFILE ----------
         profile = StudentProfile.query.filter_by(user_id=user.id).first()
         if not profile:
             profile = StudentProfile(
@@ -51,7 +52,6 @@ def upload_survey():
             )
             db.session.add(profile)
 
-        # ---------- SEMESTER ----------
         semester = Semester.query.filter_by(
             user_id=user.id,
             name="Survey Semester"
@@ -62,12 +62,10 @@ def upload_survey():
             db.session.add(semester)
             db.session.flush()
 
-        # ---------- COURSES ----------
         for _, row in group.iterrows():
 
             course_code = str(row["course"]).strip() if pd.notna(row["course"]) else "UNKNOWN"
 
-            # 🔥 Prevent duplicates
             existing_course = Course.query.filter_by(
                 semester_id=semester.id,
                 course_code=course_code
@@ -87,7 +85,6 @@ def upload_survey():
             grade = str(row["grade"]).strip()
             gpa = float(row["points"])
 
-            # COURSE
             course = Course(
                 semester_id=semester.id,
                 course_code=course_code,
@@ -97,7 +94,6 @@ def upload_survey():
             db.session.add(course)
             db.session.flush()
 
-            # HABIT
             habit = StudyHabit(
                 course_id=course.id,
                 study_hours=study_hours,
@@ -106,7 +102,6 @@ def upload_survey():
             )
             db.session.add(habit)
 
-            # PERFORMANCE
             performance = Performance(
                 course_id=course.id,
                 grade=grade,
@@ -116,6 +111,10 @@ def upload_survey():
 
     db.session.commit()
 
+    # ✅ AUTO RETRAIN
+    if should_retrain():
+        retrain_model()
+
     return jsonify({
         "message": "Upload successful",
         "users": int(df["username"].nunique())
@@ -123,60 +122,7 @@ def upload_survey():
 
 
 # ===============================
-# COURSES
-# ===============================
-@survey_bp.route("/user/<email>/courses", methods=["GET"])
-def get_user_courses(email):
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
-    result = []
-
-    for sem in user.semesters:
-        for c in sem.courses:
-
-            perf = c.performance
-            habit = c.study_habits[0] if c.study_habits else None
-
-            result.append({
-                "course_code": c.course_code,
-                "grade": perf.grade if perf else None,
-                "gpa": perf.gpa if perf else None,
-                "study_hours": habit.study_hours if habit else None,
-                "study_method": habit.study_method if habit else None
-            })
-
-    return jsonify(result)
-
-
-# ===============================
-# GPA
-# ===============================
-@survey_bp.route("/user/<email>/gpa", methods=["GET"])
-def get_user_gpa(email):
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
-    total, count = 0, 0
-
-    for sem in user.semesters:
-        for c in sem.courses:
-            if c.performance and c.performance.gpa is not None:
-                total += c.performance.gpa
-                count += 1
-
-    return jsonify({
-        "email": email,
-        "gpa": round(total / count, 2) if count else 0
-    })
-
-
-# ===============================
-# INSIGHTS
+# USER INSIGHTS
 # ===============================
 @survey_bp.route("/user/<email>/insights", methods=["GET"])
 def user_insights(email):
@@ -205,14 +151,12 @@ def user_insights(email):
         "avg_gpa": round(sum(gpas)/len(gpas), 2) if gpas else 0,
         "avg_study_hours": round(sum(hours)/len(hours), 2) if hours else 0,
         "avg_difficulty": round(sum(diffs)/len(diffs), 2) if diffs else 0,
-        "total_courses": len(gpas)  
+        "total_courses": len(gpas)
     })
 
 
-
-
 # ===============================
-# ML RECOMMENDER 
+# ML RECOMMENDER
 # ===============================
 @survey_bp.route("/ml-recommend/<email>", methods=["GET"])
 def ml_recommend(email):
@@ -222,41 +166,19 @@ def ml_recommend(email):
         return jsonify({"error": "User not found"}), 404
 
     results = []
-
-    # =========================
-    # CLUSTERING 
-    # =========================
     similar_students = get_similar_students(email)
 
     peer_message = "No peer data available yet"
 
     if isinstance(similar_students, pd.DataFrame) and not similar_students.empty:
+        peer_avg = round(similar_students["avg_gpa"].mean(), 2)
+        peer_hours = round(similar_students["avg_hours"].mean(), 2)
 
-        if "avg_gpa" in similar_students.columns:
-
-            peer_avg = round(similar_students["avg_gpa"].mean(), 2)
-            peer_hours = round(similar_students["avg_hours"].mean(), 2)
-
-            user_row = similar_students[
-            similar_students["username"] == email.lower()
-        ]
-
-            rank_text = ""
-
-            if not user_row.empty and "rank" in similar_students.columns:
-                user_rank = int(user_row.iloc[0]["rank"])
-                total = len(similar_students)
-
-                rank_text = f" You rank {user_rank}/{total} in your peer group."
-
-            peer_message = (
+        peer_message = (
             f"Students like you study ~{peer_hours} hrs "
-            f"and average GPA {peer_avg}.{rank_text}"
+            f"and average GPA {peer_avg}."
         )
 
-    # =========================
-    # COURSE LOOP
-    # =========================
     for sem in user.semesters:
         for c in sem.courses:
 
@@ -273,21 +195,17 @@ def ml_recommend(email):
                 c.unit or 3
             )
 
-            suggestion = (
-                "Current strategy is optimal"
-                if rec["improved_gpa"] <= rec["current_gpa"]
-                else f"Study {rec['recommended_hours']} hrs using {rec['recommended_method']}"
-            )
+            perf.predicted_gpa = rec["current_gpa"]
 
             results.append({
                 "course": c.course_code,
                 "current_gpa": rec["current_gpa"],
                 "improved_gpa": rec["improved_gpa"],
-                "suggestion": suggestion,
                 "confidence": rec.get("confidence", 0),
-                "why": rec.get("explanations", []),
                 "peer_insight": peer_message
             })
+
+    db.session.commit()
 
     summary = generate_ai_summary(results)
 
@@ -297,14 +215,70 @@ def ml_recommend(email):
     })
 
 
-@survey_bp.route("/evaluate-model", methods=["GET"])
-def evaluate():
+# ===============================
+# MODEL ERROR
+# ===============================
+@survey_bp.route("/model-error/<email>", methods=["GET"])
+def model_error(email):
 
-    file_path = "temp.csv"
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
-    df = transform_survey_data(file_path)
-    df = df.dropna(subset=["points"])
+    errors = []
+    detailed = []
 
-    metrics = evaluate_model(df)
+    for sem in user.semesters:
+        for c in sem.courses:
 
-    return jsonify(metrics)
+            perf = c.performance
+
+            if not perf or perf.gpa is None or perf.predicted_gpa is None:
+                continue
+
+            actual = perf.gpa
+            predicted = perf.predicted_gpa
+
+            error = actual - predicted
+
+            errors.append(error)
+
+            detailed.append({
+                "course": c.course_code,
+                "actual": actual,
+                "predicted": predicted,
+                "error": round(error, 2)
+            })
+
+    if not errors:
+        return jsonify({"message": "No prediction data available yet"})
+
+    mae = sum(abs(e) for e in errors) / len(errors)
+    rmse = sqrt(sum(e**2 for e in errors) / len(errors))  # ✅ FIXED
+    bias = sum(errors) / len(errors)
+
+    return jsonify({
+        "courses": detailed,
+        "metrics": {
+            "MAE": round(mae, 3),
+            "RMSE": round(rmse, 3),
+            "Bias": round(bias, 3)
+        }
+    })
+
+
+# ===============================
+# AUTO RETRAIN
+# ===============================
+@survey_bp.route("/auto-retrain", methods=["POST"])
+def auto_retrain():
+
+    if not should_retrain():
+        return jsonify({"message": "Model is stable"})
+
+    result = retrain_model()
+
+    return jsonify({
+        "message": "Model auto-retrained",
+        "details": result
+    })

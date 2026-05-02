@@ -7,15 +7,8 @@ import numpy as np
 # ==============================
 model = joblib.load("ml/recommender.pkl")
 scaler = joblib.load("ml/scaler.pkl")
+FEATURE_COLUMNS = joblib.load("ml/feature_columns.pkl")
 
-FEATURE_COLUMNS = [
-    "study_time",
-    "difficulty",
-    "study_method",
-    "unit",
-    "effort_score",
-    "difficulty_pressure"
-]
 
 # ==============================
 # ENCODING
@@ -56,12 +49,11 @@ def predict(features):
     X_df = pd.DataFrame([features], columns=FEATURE_COLUMNS)
     X_scaled = scaler.transform(X_df)
 
-    pred = float(model.predict(X_scaled)[0])
-    return pred
+    return float(model.predict(X_scaled)[0])
 
 
 # ==============================
-# STATISTICAL CONFIDENCE
+# CONFIDENCE
 # ==============================
 def compute_confidence(features, base_prediction, n_samples=20):
 
@@ -70,7 +62,6 @@ def compute_confidence(features, base_prediction, n_samples=20):
     for _ in range(n_samples):
         noise = np.random.normal(0, 0.05, len(features))
 
-        # avoid corrupting categorical meaning (method index = 2)
         noisy = [
             f + n if i != 2 else f
             for i, (f, n) in enumerate(zip(features, noise))
@@ -79,8 +70,6 @@ def compute_confidence(features, base_prediction, n_samples=20):
         preds.append(predict(noisy))
 
     std = np.std(preds)
-
-    # Convert std → confidence (lower std = higher confidence)
     confidence = 1 / (1 + std)
 
     return round(float(confidence), 2)
@@ -122,8 +111,7 @@ def optimize_recommendation(current_hours, difficulty, method, unit):
     best_gpa = -1
     best_plan = (current_hours, method)
 
-    # SEARCH SPACE
-    for hours in range(1, 6):  # expanded slightly
+    for hours in range(1, 6):
         for m in ["Active", "Passive"]:
 
             features = build_features(hours, difficulty, m, unit)
@@ -133,16 +121,13 @@ def optimize_recommendation(current_hours, difficulty, method, unit):
                 best_gpa = pred
                 best_plan = (hours, m)
 
-    # CURRENT PERFORMANCE
     current_features = build_features(current_hours, difficulty, method, unit)
     current_gpa = predict(current_features)
 
-    # PREVENT FAKE IMPROVEMENT
     if best_gpa <= current_gpa:
         best_gpa = current_gpa
         best_plan = (current_hours, method)
 
-    # CONFIDENCE (fixed)
     confidence = compute_confidence(current_features, current_gpa)
 
     explanations = generate_explanations(
@@ -161,7 +146,7 @@ def optimize_recommendation(current_hours, difficulty, method, unit):
 
 
 # ==============================
-# AI SUMMARY
+# SUMMARY
 # ==============================
 def generate_ai_summary(results):
 

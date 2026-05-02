@@ -174,6 +174,6 @@ class Performance(db.Model):
     
     gpa = db.Column(db.Float)
 
-    predicted_gpa = db.Column(db.Float)
+    predicted_gpa = db.Column(db.Float, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
