@@ -53,9 +53,10 @@
         </div>
     </div>
 
+    <!-- AI Summary -->
     <div class="card p-3 mb-4 shadow">
-    <h5>🤖 AI Summary</h5>
-    <p id="aiSummary">--</p>
+        <h5>🤖 AI Summary</h5>
+        <p id="aiSummary">--</p>
     </div>
 
     <!-- Chart -->
@@ -77,104 +78,126 @@ async function loadDashboard() {
 
     const email = document.getElementById("email").value;
 
-    // =====================
-    // LOAD INSIGHTS
-    // =====================
-    const res1 = await fetch(`/user/${email}/insights`);
-    const insights = await res1.json();
-
-    document.getElementById("gpa").innerText = insights.avg_gpa;
-    document.getElementById("hours").innerText = insights.avg_study_hours;
-    document.getElementById("difficulty").innerText = insights.avg_difficulty;
-    document.getElementById("courses").innerText = insights.total_courses;
-
-    // =====================
-    // LOAD ML DATA
-    // =====================
-    const res2 = await fetch(`/ml-recommend/${email}`);
-    const response = await res2.json();
-
-    const data = response.results || [];
-    const summary = response.summary || "No insights available.";
-
-    // ✅ FIX: set summary AFTER fetch
-    document.getElementById("aiSummary").innerText = summary;
-
-    const container = document.getElementById("recommendations");
-    container.innerHTML = "";
-
-    let labels = [];
-    let currentData = [];
-    let improvedData = [];
-
-    if (data.length === 0) {
-        container.innerHTML = `<div class="alert alert-warning">No recommendations found</div>`;
+    if (!email) {
+        alert("Enter email");
         return;
     }
 
-    data.forEach(item => {
+    try {
 
-        labels.push(item.course);
-        currentData.push(item.current_gpa);
-        improvedData.push(item.improved_gpa);
+        // =====================
+        // LOAD INSIGHTS
+        // =====================
+        const res1 = await fetch(`/user/${email}/insights`);
 
-        const confidencePercent = Math.round((item.confidence || 0) * 100);
+        if (!res1.ok) throw new Error("User not found");
 
-        const explanations = (item.why || []).map(e => `<li>${e}</li>`).join("");
+        const insights = await res1.json();
 
-        const card = `
-        <div class="card p-3 mb-3 shadow">
-            <h5>${item.course}</h5>
+        document.getElementById("gpa").innerText = insights.avg_gpa || 0;
+        document.getElementById("hours").innerText = insights.avg_study_hours || 0;
+        document.getElementById("difficulty").innerText = insights.avg_difficulty || 0;
+        document.getElementById("courses").innerText = insights.total_courses || 0;
 
-            <p><b>Current GPA:</b> ${item.current_gpa}</p>
-            <p><b>Improved GPA:</b> ${item.improved_gpa}</p>
+        // =====================
+        // LOAD ML DATA
+        // =====================
+        const res2 = await fetch(`/ml-recommend/${email}`);
+        const response = await res2.json();
 
-            <p><b>Suggestion:</b> ${item.suggestion}</p>
+        const data = response.results || [];
+        const summary = response.summary || "No insights available.";
 
-            <label><b>Confidence:</b> ${confidencePercent}%</label>
-            <div class="progress mb-2">
-                <div class="progress-bar bg-success" 
-                     style="width: ${confidencePercent}%">
-                </div>
-            </div>
+        document.getElementById("aiSummary").innerText = summary;
 
-            <ul>${explanations}</ul>
+        const container = document.getElementById("recommendations");
+        container.innerHTML = "";
 
-            ${item.peer_insight ? `<p><i>${item.peer_insight}</i></p>` : ""}
-        </div>
-        `;
+        let labels = [];
+        let currentData = [];
+        let improvedData = [];
 
-        container.innerHTML += card;
-    });
-
-    // =====================
-    // DRAW CHART
-    // =====================
-    const ctx = document.getElementById('gpaChart');
-
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
-
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Current GPA',
-                    data: currentData
-                },
-                {
-                    label: 'Improved GPA',
-                    data: improvedData
-                }
-            ]
-        },
-        options: {
-            responsive: true
+        if (data.length === 0) {
+            container.innerHTML = `<div class="alert alert-warning">No recommendations found</div>`;
+            return;
         }
-    });
+
+        data.forEach(item => {
+
+            labels.push(item.course);
+            currentData.push(item.current_gpa);
+            improvedData.push(item.improved_gpa);
+
+            const confidencePercent = Math.round((item.confidence || 0) * 100);
+
+            const explanations = (item.why || [])
+                .map(e => `<li>${e}</li>`)
+                .join("");
+
+            // =====================
+            // RISK COLOR
+            // =====================
+            let risk = item.risk || "low";
+            let riskColor = "success";
+
+            if (risk === "high") riskColor = "danger";
+            else if (risk === "medium") riskColor = "warning";
+
+            const suggestion = item.suggestion || "No suggestion available";
+
+            const card = `
+            <div class="card p-3 mb-3 shadow border-${riskColor}">
+                <h5>${item.course}</h5>
+
+                <span class="badge bg-${riskColor} mb-2">
+                    ${risk.toUpperCase()} RISK
+                </span>
+
+                <p><b>Current GPA:</b> ${item.current_gpa}</p>
+                <p><b>Improved GPA:</b> ${item.improved_gpa}</p>
+
+                <p><b>Suggestion:</b> ${suggestion}</p>
+
+                <label><b>Confidence:</b> ${confidencePercent}%</label>
+                <div class="progress mb-2">
+                    <div class="progress-bar bg-${riskColor}" 
+                         style="width: ${confidencePercent}%">
+                    </div>
+                </div>
+
+                ${explanations ? `<ul>${explanations}</ul>` : ""}
+
+                ${item.peer_insight ? `<p><i>${item.peer_insight}</i></p>` : ""}
+            </div>
+            `;
+
+            container.innerHTML += card;
+        });
+
+        // =====================
+        // CHART
+        // =====================
+        const ctx = document.getElementById('gpaChart');
+
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Current GPA', data: currentData },
+                    { label: 'Improved GPA', data: improvedData }
+                ]
+            },
+            options: {
+                responsive: true
+            }
+        });
+
+    } catch (error) {
+        alert(error.message);
+    }
 }
 </script>
 

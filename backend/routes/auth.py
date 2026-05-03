@@ -1,9 +1,23 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from models import db, User
 from utils.validators import is_valid_email
 from utils.tokens import generate_reset_token, verify_reset_token
 
+from flask_jwt_extended import create_access_token
+
 auth_bp = Blueprint("auth", __name__)
+
+
+
+@auth_bp.route("/login", methods=["GET"])
+def login_page():
+    return render_template("login.html")
+
+
+@auth_bp.route("/register", methods=["GET"])
+def register_page():
+    return render_template("register.html")
+
 
 
 # =========================
@@ -12,7 +26,7 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/register", methods=["POST"])
 def register():
 
-    data = request.json
+    data = request.get_json()
     email = data.get("email")
     password = data.get("password")
 
@@ -38,12 +52,12 @@ def register():
 
 
 # =========================
-# LOGIN
+# LOGIN 
 # =========================
 @auth_bp.route("/login", methods=["POST"])
 def login():
 
-    data = request.json
+    data = request.get_json()
     email = data.get("email")
     password = data.get("password")
 
@@ -52,9 +66,11 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
+    token = create_access_token(identity=user.email)
+
     return jsonify({
         "message": "Login successful",
-        "email": user.email
+        "token": token
     })
 
 
@@ -76,15 +92,18 @@ def forgot_password():
 
     return jsonify({
         "message": "Reset link generated",
-        "reset_link": reset_link  # remove in production
+        "reset_link": reset_link
     })
 
 
 # =========================
 # RESET PASSWORD
 # =========================
-@auth_bp.route("/reset-password/<token>", methods=["POST"])
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
+
+    if request.method == "GET":
+        return render_template("reset_password.html")
 
     email = verify_reset_token(token)
 

@@ -1,22 +1,22 @@
 import pandas as pd
-
 from flask import Blueprint, request, jsonify
-from data_processing.transform_survey import transform_survey_data
 from models import db, User, Semester, Course, StudyHabit, Performance, StudentProfile
+from data_processing.transform_survey import transform_survey_data
 from ml.recommender_engine import optimize_recommendation, generate_ai_summary
 from ml.similarity import get_similar_students
-from ml.evaluate import evaluate_model
 from ml.retrain import retrain_model
 from ml.auto_retrain import should_retrain
 from math import sqrt
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 survey_bp = Blueprint("survey", __name__)
 
 
 # ===============================
-# UPLOAD SURVEY
+# UPLOAD SURVEY (PROTECTED)
 # ===============================
 @survey_bp.route("/upload-survey", methods=["POST"])
+@jwt_required()
 def upload_survey():
 
     if "file" not in request.files:
@@ -74,44 +74,31 @@ def upload_survey():
             if existing_course:
                 continue
 
-            unit = int(row["unit"]) if pd.notna(row["unit"]) else 3
-            difficulty = int(row["difficulty"]) if pd.notna(row["difficulty"]) else 0
-            study_hours = float(row["study_time"]) if pd.notna(row["study_time"]) else 0.0
-            study_method = (
-                str(row["study_method"]).strip().capitalize()
-                if pd.notna(row["study_method"]) else "Unknown"
-            )
-
-            grade = str(row["grade"]).strip()
-            gpa = float(row["points"])
-
             course = Course(
                 semester_id=semester.id,
                 course_code=course_code,
-                unit=unit,
-                difficulty=difficulty
+                unit=int(row["unit"]) if pd.notna(row["unit"]) else 3,
+                difficulty=int(row["difficulty"]) if pd.notna(row["difficulty"]) else 0
             )
             db.session.add(course)
             db.session.flush()
 
             habit = StudyHabit(
                 course_id=course.id,
-                study_hours=study_hours,
-                study_method=study_method,
-                focus_score=None
+                study_hours=float(row["study_time"]) if pd.notna(row["study_time"]) else 0.0,
+                study_method=str(row["study_method"]).capitalize() if pd.notna(row["study_method"]) else "Unknown"
             )
             db.session.add(habit)
 
             performance = Performance(
                 course_id=course.id,
-                grade=grade,
-                gpa=gpa
+                grade=str(row["grade"]),
+                gpa=float(row["points"])
             )
             db.session.add(performance)
 
     db.session.commit()
 
-    # ✅ AUTO RETRAIN
     if should_retrain():
         retrain_model()
 
@@ -122,12 +109,15 @@ def upload_survey():
 
 
 # ===============================
-# USER INSIGHTS
+# USER INSIGHTS (PROTECTED)
 # ===============================
-@survey_bp.route("/user/<email>/insights", methods=["GET"])
-def user_insights(email):
+@survey_bp.route("/user/insights", methods=["GET"])
+@jwt_required()
+def user_insights():
 
+    email = get_jwt_identity()
     user = User.query.filter_by(email=email).first()
+
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -156,28 +146,28 @@ def user_insights(email):
 
 
 # ===============================
-# ML RECOMMENDER
+# ML RECOMMENDER (PROTECTED)
 # ===============================
-@survey_bp.route("/ml-recommend/<email>", methods=["GET"])
-def ml_recommend(email):
+@survey_bp.route("/ml-recommend", methods=["GET"])
+@jwt_required()
+def ml_recommend():
 
+    email = get_jwt_identity()
     user = User.query.filter_by(email=email).first()
+
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     results = []
-    similar_students = get_similar_students(email)
 
+    similar_students = get_similar_students(email)
     peer_message = "No peer data available yet"
 
     if isinstance(similar_students, pd.DataFrame) and not similar_students.empty:
         peer_avg = round(similar_students["avg_gpa"].mean(), 2)
         peer_hours = round(similar_students["avg_hours"].mean(), 2)
 
-        peer_message = (
-            f"Students like you study ~{peer_hours} hrs "
-            f"and average GPA {peer_avg}."
-        )
+        peer_message = f"Students like you study ~{peer_hours} hrs and average GPA {peer_avg}."
 
     for sem in user.semesters:
         for c in sem.courses:
@@ -195,14 +185,35 @@ def ml_recommend(email):
                 c.unit or 3
             )
 
-            perf.predicted_gpa = rec["current_gpa"]
+            current = rec["current_gpa"]
+            improved = rec["improved_gpa"]
+
+            perf.predicted_gpa = improved
+
+            suggestion = (
+                "Current strategy is optimal"
+                if improved <= current
+                else f"Study {rec.get('recommended_hours', 0)} hrs using {rec.get('recommended_method', 'Unknown')}"
+            )
+
+            gap = improved - current
+
+            if current < 2.0:
+                risk = "high"
+            elif gap > 1.5:
+                risk = "medium"
+            else:
+                risk = "low"
 
             results.append({
                 "course": c.course_code,
-                "current_gpa": rec["current_gpa"],
-                "improved_gpa": rec["improved_gpa"],
+                "current_gpa": current,
+                "improved_gpa": improved,
+                "suggestion": suggestion,
                 "confidence": rec.get("confidence", 0),
-                "peer_insight": peer_message
+                "why": rec.get("explanations", []),
+                "peer_insight": peer_message,
+                "risk": risk
             })
 
     db.session.commit()
@@ -216,12 +227,15 @@ def ml_recommend(email):
 
 
 # ===============================
-# MODEL ERROR
+# MODEL ERROR (PROTECTED)
 # ===============================
-@survey_bp.route("/model-error/<email>", methods=["GET"])
-def model_error(email):
+@survey_bp.route("/model-error", methods=["GET"])
+@jwt_required()
+def model_error():
 
+    email = get_jwt_identity()
     user = User.query.filter_by(email=email).first()
+
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -240,7 +254,6 @@ def model_error(email):
             predicted = perf.predicted_gpa
 
             error = actual - predicted
-
             errors.append(error)
 
             detailed.append({
@@ -254,7 +267,7 @@ def model_error(email):
         return jsonify({"message": "No prediction data available yet"})
 
     mae = sum(abs(e) for e in errors) / len(errors)
-    rmse = sqrt(sum(e**2 for e in errors) / len(errors))  # ✅ FIXED
+    rmse = sqrt(sum(e**2 for e in errors) / len(errors))
     bias = sum(errors) / len(errors)
 
     return jsonify({
@@ -268,9 +281,10 @@ def model_error(email):
 
 
 # ===============================
-# AUTO RETRAIN
+# AUTO RETRAIN (
 # ===============================
 @survey_bp.route("/auto-retrain", methods=["POST"])
+@jwt_required()
 def auto_retrain():
 
     if not should_retrain():
