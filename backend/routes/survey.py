@@ -109,7 +109,7 @@ def upload_survey():
 
 
 # ===============================
-# USER INSIGHTS (PROTECTED)
+# USER INSIGHTS 
 # ===============================
 @survey_bp.route("/user/insights", methods=["GET"])
 @jwt_required()

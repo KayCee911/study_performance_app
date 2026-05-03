@@ -1,40 +1,259 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Upload Survey</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload Survey — EduPortal</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #080c14; --surface: #0e1420; --card: #121929;
+  --border: rgba(255,255,255,0.07); --border-accent: rgba(0,210,170,0.3);
+  --accent: #00d2aa; --accent-dim: rgba(0,210,170,0.08);
+  --amber: #f4a62a; --amber-dim: rgba(244,166,42,0.1);
+  --text: #e8eaf2; --muted: #6b7494; --subtle: #3a4060;
+  --danger: #ff5c6a; --radius: 14px;
+}
+body { font-family: 'Sora', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; animation: drift 22s ease-in-out infinite; }
+.orb-1 { width: 360px; height: 360px; background: rgba(0,210,170,0.05); top: -80px; right: -60px; }
+.orb-2 { width: 300px; height: 300px; background: rgba(244,166,42,0.05); bottom: -60px; left: -40px; animation-delay: -11s; }
+@keyframes drift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(20px,25px); } }
+.grid-bg { position: fixed; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 40px 40px; }
+.page { position: relative; z-index: 1; width: 100%; max-width: 480px; padding: 24px; animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
+.brand-mark { width: 36px; height: 36px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: #080c14; }
+.brand-name { font-size: 15px; font-weight: 500; }
+.brand-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.4; }
+.card-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.card-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--subtle);
+  border-radius: 16px;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  margin-bottom: 20px;
+}
+.drop-zone:hover, .drop-zone.hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.drop-zone.has-file {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-dim);
+}
+.drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon { margin-bottom: 12px; }
+.drop-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.drop-sub { font-size: 12px; color: var(--muted); }
+.drop-sub span { color: var(--accent); font-weight: 500; }
+
+/* File preview */
+.file-preview {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  align-items: center;
+  gap: 12px;
+}
+.file-preview.active { display: flex; }
+.file-icon { width: 36px; height: 36px; background: var(--accent-dim); border-radius: 8px; border: 1px solid rgba(0,210,170,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'DM Mono', monospace; }
+.file-size { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.file-remove { color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; transition: color 0.2s; flex-shrink: 0; }
+.file-remove:hover { color: var(--danger); }
+
+/* Info box */
+.info-box { background: var(--amber-dim); border: 1px solid rgba(244,166,42,0.2); border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; margin-bottom: 20px; }
+.info-icon { flex-shrink: 0; margin-top: 1px; }
+.info-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.info-text strong { color: var(--amber); font-weight: 500; }
+
+.btn { width: 100%; padding: 14px; background: var(--accent); color: #080c14; border: none; border-radius: var(--radius); font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s; letter-spacing: 0.02em; position: relative; }
+.btn:hover { opacity: 0.92; box-shadow: 0 6px 24px rgba(0,210,170,0.25); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn.loading { color: transparent; }
+.btn.loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(8,12,20,0.3); border-top-color: #080c14; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Progress bar */
+.progress-wrap { display: none; margin-top: 16px; }
+.progress-wrap.active { display: block; }
+.progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.progress-bar { height: 4px; background: var(--subtle); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 4px; width: 0; transition: width 0.3s ease; }
+
+.msg { margin-top: 16px; padding: 11px 14px; border-radius: 10px; font-size: 13px; line-height: 1.4; display: none; }
+.msg.error { background: rgba(255,92,106,0.1); color: var(--danger); border: 1px solid rgba(255,92,106,0.2); display: block; }
+.msg.success { background: rgba(0,210,170,0.1); color: var(--accent); border: 1px solid rgba(0,210,170,0.2); display: block; }
+</style>
 </head>
 <body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="grid-bg"></div>
+<div class="page">
+  <div class="brand">
+    <div class="brand-mark">E</div>
+    <div>
+      <div class="brand-name">EduPortal</div>
+      <div class="brand-sub">Learning Management System</div>
+    </div>
+  </div>
+  <div class="card">
+    <h1 class="card-title">Upload survey data</h1>
+    <p class="card-sub">Upload a CSV file containing survey responses. Data will be processed and available on your dashboard.</p>
 
-<h2>Upload Survey CSV</h2>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" name="file" accept=".csv" id="fileInput" onchange="onFileSelect(this)">
+      <div class="drop-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b7494" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="drop-title">Drop your CSV here</div>
+      <div class="drop-sub">or <span>browse files</span> from your computer</div>
+    </div>
 
-<form id="uploadForm">
-    <input type="file" name="file" required />
-    <button type="submit">Upload</button>
-</form>
+    <div class="file-preview" id="filePreview">
+      <div class="file-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d2aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <div class="file-info">
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-size" id="fileSize">—</div>
+      </div>
+      <span class="file-remove" onclick="removeFile()" title="Remove file">×</span>
+    </div>
 
-<p id="status"></p>
+    <div class="info-box">
+      <div class="info-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f4a62a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="info-text">Expected format: <strong>CSV with headers</strong> on the first row. Supported columns: respondent_id, question, response, timestamp. Max file size: <strong>10 MB</strong>.</div>
+    </div>
 
+    <button class="btn" id="uploadBtn" onclick="upload()" disabled>Upload survey</button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label"><span>Uploading…</span><span id="pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
 <script>
-document.getElementById("uploadForm").onsubmit = async (e) => {
-    e.preventDefault();
+let selectedFile = null;
 
-    const formData = new FormData(e.target);
+function onFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatSize(file.size);
+  document.getElementById('filePreview').classList.add('active');
+  document.getElementById('dropZone').classList.add('has-file');
+  document.getElementById('uploadBtn').disabled = false;
+}
 
-    const res = await fetch("/upload-survey", {
-        method: "POST",
-        body: formData
-    });
+function removeFile() {
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('filePreview').classList.remove('active');
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('uploadBtn').disabled = true;
+}
 
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Drag and drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('hover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('hover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('hover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('fileInput').files = dt.files;
+    onFileSelect(document.getElementById('fileInput'));
+  }
+});
+
+async function upload() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('uploadBtn');
+  const msg = document.getElementById('msg');
+  const prog = document.getElementById('progressWrap');
+  msg.className = 'msg'; msg.textContent = '';
+  btn.classList.add('loading'); btn.disabled = true;
+  prog.classList.add('active');
+
+  // Simulate progress
+  let pct = 0;
+  const tick = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 15, 90);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('pct').textContent = Math.round(pct) + '%';
+  }, 200);
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  try {
+    const res = await fetch('/upload-survey', { method: 'POST', body: formData });
+    clearInterval(tick);
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('pct').textContent = '100%';
     const data = await res.json();
-
-    document.getElementById("status").innerText = data.message;
-
-    // 🔥 redirect to dashboard after upload
-    setTimeout(() => {
-        window.location.href = "/dashboard";
-    }, 1500);
-};
+    if (res.ok) {
+      msg.textContent = data.message || 'Upload successful! Redirecting to dashboard…';
+      msg.classList.add('success');
+      setTimeout(() => window.location.href = '/dashboard', 1500);
+    } else {
+      msg.textContent = data.error || 'Upload failed. Please try again.';
+      msg.classList.add('error');
+      prog.classList.remove('active');
+      btn.classList.remove('loading'); btn.disabled = false;
+    }
+  } catch {
+    clearInterval(tick);
+    msg.textContent = 'Network error. Please check your connection.';
+    msg.classList.add('error');
+    prog.classList.remove('active');
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
 </script>
-
 </body>
 </html>

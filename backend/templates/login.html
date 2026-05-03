@@ -1,41 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — EduPortal</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #080c14; --surface: #0e1420; --card: #121929;
+  --border: rgba(255,255,255,0.07); --border-glow: rgba(0,210,170,0.25);
+  --accent: #00d2aa; --accent-dim: rgba(0,210,170,0.12);
+  --text: #e8eaf2; --muted: #6b7494; --subtle: #3a4060;
+  --danger: #ff5c6a; --radius: 14px;
+}
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex;
+  align-items: center; justify-content: center; overflow: hidden;
+}
+.orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; animation: drift 18s ease-in-out infinite; }
+.orb-1 { width: 400px; height: 400px; background: rgba(0,210,170,0.06); top: -100px; right: -80px; }
+.orb-2 { width: 350px; height: 350px; background: rgba(244,166,42,0.05); bottom: -80px; left: -60px; animation-delay: -9s; }
+@keyframes drift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,30px) scale(1.05); } }
+.grid-bg {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.page { position: relative; z-index: 1; width: 100%; max-width: 420px; padding: 24px; animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
+.brand-mark { width: 36px; height: 36px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: #080c14; flex-shrink: 0; }
+.brand-name { font-size: 15px; font-weight: 500; }
+.brand-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.4; }
+.card-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.card-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+.badge { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,210,170,0.2); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 500; margin-bottom: 16px; }
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.field { margin-bottom: 18px; }
+.field-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.field-row label { margin-bottom: 0; }
+.field input { width: 100%; padding: 13px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; outline: none; }
+.field input:hover { border-color: var(--subtle); }
+.field input:focus { border-color: var(--accent); background: rgba(0,210,170,0.04); box-shadow: 0 0 0 3px rgba(0,210,170,0.1); }
+.field input::placeholder { color: var(--subtle); }
+.forgot-link { font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 500; opacity: 0.8; transition: opacity 0.2s; }
+.forgot-link:hover { opacity: 1; }
+.btn { width: 100%; padding: 14px; background: var(--accent); color: #080c14; border: none; border-radius: var(--radius); font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s; letter-spacing: 0.02em; position: relative; }
+.btn:hover { opacity: 0.92; box-shadow: 0 6px 24px rgba(0,210,170,0.25); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn.loading { color: transparent; }
+.btn.loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(8,12,20,0.3); border-top-color: #080c14; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.msg { margin-top: 16px; padding: 11px 14px; border-radius: 10px; font-size: 13px; line-height: 1.4; display: none; }
+.msg.error { background: rgba(255,92,106,0.1); color: var(--danger); border: 1px solid rgba(255,92,106,0.2); display: block; }
+.msg.success { background: rgba(0,210,170,0.1); color: var(--accent); border: 1px solid rgba(0,210,170,0.2); display: block; }
+.footer-link { text-align: center; margin-top: 24px; font-size: 13px; color: var(--muted); }
+.footer-link a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.footer-link a:hover { text-decoration: underline; }
+</style>
 </head>
 <body>
-
-<h2>Login</h2>
-
-<input id="email" placeholder="Email"><br>
-<input id="password" type="password" placeholder="Password"><br>
-<button onclick="login()">Login</button>
-
-<p id="msg"></p>
-
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="grid-bg"></div>
+<div class="page">
+  <div class="brand">
+    <div class="brand-mark">E</div>
+    <div>
+      <div class="brand-name">EduPortal</div>
+      <div class="brand-sub">Learning Management System</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="badge"><div class="badge-dot"></div> Secure login</div>
+    <h1 class="card-title">Welcome back</h1>
+    <p class="card-sub">Sign in to continue your learning journey</p>
+    <div class="field">
+      <label>Email address</label>
+      <input id="email" type="email" placeholder="you@university.edu" autocomplete="email">
+    </div>
+    <div class="field">
+      <div class="field-row">
+        <label>Password</label>
+        <a href="/forgot-password" class="forgot-link">Forgot password?</a>
+      </div>
+      <input id="password" type="password" placeholder="••••••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="loginBtn" onclick="login()">Sign in</button>
+    <div class="msg" id="msg"></div>
+  </div>
+  <p class="footer-link">Don't have an account? <a href="/register">Create one</a></p>
+</div>
 <script>
 async function login() {
-
-    const res = await fetch("/login", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            email: email.value,
-            password: password.value
-        })
+  const btn = document.getElementById('loginBtn');
+  const msg = document.getElementById('msg');
+  msg.className = 'msg'; msg.textContent = '';
+  btn.classList.add('loading'); btn.disabled = true;
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value, password: password.value })
     });
-
     const data = await res.json();
-    msg.innerText = data.message || data.error;
-
     if (res.ok) {
-        // ✅ STORE TOKEN (not email)
-        localStorage.setItem("token", data.token);
-
-        window.location.href = "/dashboard";
+      localStorage.setItem('token', data.token);
+      msg.textContent = 'Login successful! Redirecting…';
+      msg.classList.add('success');
+      setTimeout(() => window.location.href = '/dashboard', 1200);
+    } else {
+      msg.textContent = data.error || 'Something went wrong. Try again.';
+      msg.classList.add('error');
+      btn.classList.remove('loading'); btn.disabled = false;
     }
+  } catch {
+    msg.textContent = 'Network error. Please check your connection.';
+    msg.classList.add('error');
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
 }
+document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 </script>
-
 </body>
 </html>

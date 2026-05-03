@@ -19,6 +19,15 @@ def register_page():
     return render_template("register.html")
 
 
+@auth_bp.route("/forgot-password", methods=["GET"])
+def forgot_password_page():
+    return render_template("forgot-password.html")
+
+
+@auth_bp.route("/reset-password", methods=["GET"])
+def reset_password_page():
+    return render_template("reset-password.html")
+
 
 # =========================
 # REGISTER
