@@ -1,10 +1,11 @@
 import pandas as pd
+import numpy as np
+import joblib
+
 from models import Course
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import numpy as np
-import joblib
 
 from ml.recommender_engine import build_features, FEATURE_COLUMNS
 
@@ -41,16 +42,16 @@ def fetch_training_data():
 
 
 # =========================
-# RETRAIN
+# RETRAIN MODEL
 # =========================
 def retrain_model():
 
     df = fetch_training_data()
 
+    # ✅ SAFETY: NO DATA
     if df.empty:
         return {"error": "No data available for training"}
 
-    # CLEAN
     df = df.dropna()
     df = df[df["study_time"] > 0]
 
@@ -58,26 +59,31 @@ def retrain_model():
     y = []
 
     for _, row in df.iterrows():
-
         features = build_features(
             row["study_time"],
             row["difficulty"],
             row["study_method"],
             row["unit"]
         )
-
         X.append(features)
         y.append(row["points"])
 
-    # ✅ CRITICAL FIX: use DataFrame with names
+    if len(X) == 0:
+        return {"error": "Not enough valid training samples"}
+
+    # ✅ Use DataFrame for feature names
     X_df = pd.DataFrame(X, columns=FEATURE_COLUMNS)
     y = np.array(y)
 
+    # =========================
     # SCALE
+    # =========================
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_df)
 
+    # =========================
     # TRAIN
+    # =========================
     model = RandomForestRegressor(
         n_estimators=150,
         max_depth=10,
@@ -86,19 +92,21 @@ def retrain_model():
 
     model.fit(X_scaled, y)
 
+    # =========================
     # EVALUATE
+    # =========================
     preds = model.predict(X_scaled)
 
     mae = mean_absolute_error(y, preds)
     rmse = np.sqrt(mean_squared_error(y, preds))
     r2 = r2_score(y, preds)
 
-    importance = model.feature_importances_
-
-    # SAVE EVERYTHING
+    # =========================
+    # SAVE
+    # =========================
     joblib.dump(model, "ml/recommender.pkl")
     joblib.dump(scaler, "ml/scaler.pkl")
-    joblib.dump(FEATURE_COLUMNS, "ml/feature_columns.pkl")  # 🔥 NEW
+    joblib.dump(FEATURE_COLUMNS, "ml/feature_columns.pkl")
 
     return {
         "message": "Model retrained successfully",
@@ -106,5 +114,5 @@ def retrain_model():
         "mae": round(mae, 3),
         "rmse": round(rmse, 3),
         "r2": round(r2, 3),
-        "feature_importance": importance.tolist()
+        "feature_importance": model.feature_importances_.tolist()
     }

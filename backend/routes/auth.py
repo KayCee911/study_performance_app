@@ -28,6 +28,9 @@ def forgot_password_page():
 def reset_password_page():
     return render_template("reset-password.html")
 
+@auth_bp.route("/upload", methods=["GET"])
+def upload_survey_page():
+    return render_template("upload.html")
 
 # =========================
 # REGISTER

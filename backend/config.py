@@ -1,7 +1,7 @@
 import os
 
 class Config:
-    SECRET_KEY = 'your_secret_key'
+    SECRET_KEY = 'futocsc'
 
     SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2://postgres:wunnykel@localhost/study_performance_db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False

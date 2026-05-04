@@ -1,6 +1,6 @@
 from itsdangerous import URLSafeTimedSerializer
 
-SECRET_KEY = "your-secret-key"  # move to env later
+SECRET_KEY = "futocsc"  # move to env later
 
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
