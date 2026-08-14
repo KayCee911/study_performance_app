@@ -18,6 +18,8 @@ class User(db.Model):
 
     is_verified = db.Column(db.Boolean, default=False)
 
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):

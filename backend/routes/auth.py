@@ -3,7 +3,7 @@ from models import db, User
 from utils.validators import is_valid_email
 from utils.tokens import generate_reset_token, verify_reset_token
 
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -31,6 +31,11 @@ def reset_password_page():
 @auth_bp.route("/upload", methods=["GET"])
 def upload_survey_page():
     return render_template("upload.html")
+
+@auth_bp.route("/add-course", methods=["GET"])
+def add_course_page():
+    # ✅ Page is public, but JS will use JWT token to fetch data & submit forms
+    return render_template("add-course.html")
 
 # =========================
 # REGISTER

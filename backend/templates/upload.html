@@ -237,7 +237,32 @@ async function upload() {
     document.getElementById('pct').textContent = '100%';
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = data.message || 'Upload successful! Redirecting to dashboard…';
+      const feedback = data.feedback;
+      let feedbackHtml = '';
+
+      if (feedback && feedback.summary) {
+        const recommendations = feedback.recommendations || [];
+        const top = recommendations.slice(0, 3).map(r => {
+          const ways = (r.ways_to_improve || []).map(w => `<li>${w}</li>`).join('');
+          return `
+            <div style="margin-top: 10px; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+              <div style="font-weight:600; margin-bottom: 4px;">${r.course}</div>
+              <div>Projected GPA: <span style="color:#00d2aa; font-weight:600;">${Number(r.projected_gpa || 0).toFixed(2)}</span></div>
+              <div>Recommended: ${r.recommended_study_hours} hrs using ${r.recommended_method}</div>
+              <ul style="padding-left: 18px; margin-top: 6px; color:#b7bed8; font-size: 12px;">${ways}</ul>
+            </div>`;
+        }).join('');
+
+        feedbackHtml = `
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,210,170,0.2);">
+            <strong>Projected feedback</strong><br>
+            ${feedback.summary}<br>
+            <span style="color:#f4a62a; font-weight:600;">Average projected GPA: ${Number(feedback.average_projected_gpa || 0).toFixed(2)}</span>
+            ${top}
+          </div>`;
+      }
+
+      msg.innerHTML = `${data.message || 'Upload successful! Redirecting to dashboard…'}${feedbackHtml}`;
       msg.classList.add('success');
       setTimeout(() => window.location.href = '/dashboard', 1500);
     } else {

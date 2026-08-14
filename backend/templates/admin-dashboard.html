@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f8fafc; margin: 0; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+    .panel { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); margin-bottom: 24px; }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; }
+    h1, h2 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; }
+    th { background: #f8fafc; }
+    .btn { padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+    .status { margin-top: 10px; font-size: 14px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="panel">
+      <h1>Admin Dashboard</h1>
+      <div class="row">
+        <div class="card"><strong>Users</strong><div id="user-count">0</div></div>
+        <div class="card"><strong>Courses</strong><div id="course-count">0</div></div>
+        <div class="card"><strong>Students</strong><div id="student-count">0</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Create User</h2>
+      <form id="create-user-form" class="form-grid">
+        <div><input type="email" id="user-email" placeholder="Email" required /></div>
+        <div><input type="password" id="user-password" placeholder="Password" required /></div>
+        <div>
+          <select id="user-role">
+            <option value="false">Student</option>
+            <option value="true">Admin</option>
+          </select>
+        </div>
+        <div><button class="btn btn-primary" type="submit">Create User</button></div>
+      </form>
+      <div id="user-message" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Users</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Email</th><th>Role</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="users-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Add Course</h2>
+      <form id="add-course-form" class="form-grid">
+        <div><input type="number" id="semester-id" placeholder="Semester ID" required /></div>
+        <div><input type="text" id="course-code" placeholder="Course Code" required /></div>
+        <div><input type="number" id="unit" placeholder="Unit" step="0.5" required /></div>
+        <div><input type="number" id="difficulty" placeholder="Difficulty" min="1" max="5" required /></div>
+        <div><button class="btn btn-primary" type="submit">Add Course</button></div>
+      </form>
+      <div id="course-message" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Courses</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Course Code</th><th>Semester ID</th><th>Units</th><th>Difficulty</th></tr>
+        </thead>
+        <tbody id="courses-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Students Data</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Email</th><th>Username</th><th>Student ID</th><th>Department</th><th>Level</th></tr>
+        </thead>
+        <tbody id="students-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+    }
+
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      };
+    }
+
+    function showMessage(el, msg, isError = false) {
+      el.textContent = msg;
+      el.style.color = isError ? '#dc2626' : '#15803d';
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, {
+        ...options,
+        headers: { ...authHeaders(), ...(options.headers || {}) }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+      return data;
+    }
+
+    async function loadDashboard() {
+      try {
+        const users = await fetchJson('/admin/users');
+        const courses = await fetchJson('/admin/courses');
+        const students = await fetchJson('/admin/students');
+
+        document.getElementById('user-count').textContent = users.length;
+        document.getElementById('course-count').textContent = courses.length;
+        document.getElementById('student-count').textContent = students.length;
+
+        const usersBody = document.getElementById('users-table-body');
+        usersBody.innerHTML = users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${u.email}</td>
+            <td>${u.is_admin ? 'Admin' : 'Student'}</td>
+            <td><button class="btn btn-danger" onclick="deleteUser(${u.id})">Delete</button></td>
+          </tr>
+        `).join('');
+
+        const coursesBody = document.getElementById('courses-table-body');
+        coursesBody.innerHTML = courses.map(c => `
+          <tr>
+            <td>${c.id}</td>
+            <td>${c.course_code}</td>
+            <td>${c.semester_id}</td>
+            <td>${c.unit}</td>
+            <td>${c.difficulty}</td>
+          </tr>
+        `).join('');
+
+        const studentsBody = document.getElementById('students-table-body');
+        studentsBody.innerHTML = students.map(s => `
+          <tr>
+            <td>${s.student_id}</td>
+            <td>${s.email}</td>
+            <td>${s.username || '-'}</td>
+            <td>${s.student_id_code || '-'}</td>
+            <td>${s.department || '-'}</td>
+            <td>${s.level || '-'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        showMessage(document.getElementById('user-message'), err.message, true);
+      }
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('user-email').value;
+      const password = document.getElementById('user-password').value;
+      const is_admin = document.getElementById('user-role').value === 'true';
+      const msg = document.getElementById('user-message');
+
+      try {
+        await fetchJson('/admin/users', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, is_admin })
+        });
+        showMessage(msg, 'User created successfully');
+        document.getElementById('create-user-form').reset();
+        await loadDashboard();
+      } catch (err) {
+        showMessage(msg, err.message, true);
+      }
+    });
+
+    document.getElementById('add-course-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('course-message');
+      try {
+        await fetchJson('/admin/courses', {
+          method: 'POST',
+          body: JSON.stringify({
+            semester_id: Number(document.getElementById('semester-id').value),
+            course_code: document.getElementById('course-code').value,
+            unit: Number(document.getElementById('unit').value),
+            difficulty: Number(document.getElementById('difficulty').value)
+          })
+        });
+        showMessage(msg, 'Course added successfully');
+        document.getElementById('add-course-form').reset();
+        await loadDashboard();
+      } catch (err) {
+        showMessage(msg, err.message, true);
+      }
+    });
+
+    window.deleteUser = async function(userId) {
+      if (!confirm('Delete this user?')) return;
+      try {
+        await fetchJson(`/admin/users/${userId}`, { method: 'DELETE' });
+        await loadDashboard();
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    loadDashboard();
+  </script>
+</body>
+</html>

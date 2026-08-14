@@ -4,7 +4,8 @@ from config import Config
 from extensions import db, mail, migrate
 from routes.survey import survey_bp
 from routes.auth import auth_bp
-from flask_jwt_extended import JWTManager
+from routes.admin import admin_bp
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 
 from ml.retrain import retrain_model
 
@@ -16,7 +17,7 @@ def create_app():
     # =========================
     # JWT CONFIG
     # =========================
-    app.config["JWT_SECRET_KEY"] = "futocsc"
+    app.config["JWT_SECRET_KEY"] = Config.JWT_SECRET_KEY
 
     # =========================
     # INIT EXTENSIONS
@@ -31,6 +32,7 @@ def create_app():
     # =========================
     app.register_blueprint(survey_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
 
     # =========================
     # ROUTES
@@ -41,6 +43,7 @@ def create_app():
 
     @app.route("/dashboard")
     def dashboard():
+        # ✅ Page is public, but JS will use JWT token to fetch data
         return render_template("dashboard.html")
 
     # ✅ SAFE MODEL TRAIN (ONLY WHEN CALLED)

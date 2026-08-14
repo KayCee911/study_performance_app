@@ -1,7 +1,8 @@
 import os
 
 class Config:
-    SECRET_KEY = 'futocsc'
+    SECRET_KEY = 'a_super_secure_long_secret_key_for_eduportal_2026_!@#$%^&*()_+abcdefghijklmnopqrstuvwxyz'
+    JWT_SECRET_KEY = 'a_super_secure_long_jwt_secret_key_for_eduportal_2026_!@#$%^&*()_+abcdefghijklmnopqrstuvwxyz'
 
     SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2://postgres:wunnykel@localhost/study_performance_db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
