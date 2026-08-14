@@ -112,7 +112,6 @@ async function login() {
     });
     const data = await res.json();
     if (res.ok) {
-      localStorage.setItem('token', data.token);
       msg.textContent = 'Login successful! Redirecting…';
       msg.classList.add('success');
       setTimeout(() => window.location.href = '/dashboard', 1200);

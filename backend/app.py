@@ -1,11 +1,10 @@
 from flask import Flask, render_template
 from config import Config
 
-from extensions import db, mail, migrate
+from extensions import db, mail, migrate, login_manager
 from routes.survey import survey_bp
 from routes.auth import auth_bp
 from routes.admin import admin_bp
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 
 from ml.retrain import retrain_model
 
@@ -14,10 +13,18 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # =========================
-    # JWT CONFIG
-    # =========================
-    app.config["JWT_SECRET_KEY"] = Config.JWT_SECRET_KEY
+    # Initialize Flask-Login
+    login_manager.login_view = 'auth.login_page'
+    login_manager.init_app(app)
+    
+    # User loader for Flask-Login
+    from models import User
+    @login_manager.user_loader
+    def load_user(user_id):
+        try:
+            return User.query.get(int(user_id))
+        except Exception:
+            return None
 
     # =========================
     # INIT EXTENSIONS
@@ -25,7 +32,6 @@ def create_app():
     db.init_app(app)
     mail.init_app(app)
     migrate.init_app(app, db)
-    jwt = JWTManager(app)
 
     # =========================
     # REGISTER BLUEPRINTS
@@ -43,7 +49,7 @@ def create_app():
 
     @app.route("/dashboard")
     def dashboard():
-        # ✅ Page is public, but JS will use JWT token to fetch data
+        # Page is public; dashboard data fetched via public endpoints
         return render_template("dashboard.html")
 
     # ✅ SAFE MODEL TRAIN (ONLY WHEN CALLED)

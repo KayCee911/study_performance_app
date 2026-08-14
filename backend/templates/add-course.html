@@ -292,12 +292,7 @@
         
         // Initialize form
         async function initializeForm() {
-            // Get user email from JWT token or session
-            const token = localStorage.getItem('token');
-            if (!token) {
-                showAlert('Please log in to add courses', 'error');
-                return;
-            }
+            // Tokens removed — the add-course page is public. Identify user via form or default.
             
             await loadSemesters();
         }
@@ -305,11 +300,7 @@
         // Load user's semesters
         async function loadSemesters() {
             try {
-                const response = await fetch('/api/semesters', {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+                const response = await fetch('/api/semesters');
                 
                 if (!response.ok) {
                     console.log('Semesters endpoint not available, using manual entry');
@@ -387,13 +378,9 @@
             submitBtn.disabled = true;
             
             try {
-                const token = localStorage.getItem('token');
                 const response = await fetch('/add-course', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         course_code: courseCode,
                         course_name: courseName,

@@ -374,13 +374,9 @@ async function loadDashboard() {
 
   showSkeletons();
 
-  try {
-    // Load insights
-    const res1 = await fetch(`/user/${email}/insights`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    try {
+        // Load insights (public endpoint)
+        const res1 = await fetch(`/user/${email}/insights`);
     if (!res1.ok) throw new Error('User not found');
     const insights = await res1.json();
 
@@ -390,11 +386,7 @@ async function loadDashboard() {
     animateValue('courses', insights.total_courses ?? 0);
 
     // Load ML recommendations
-    const res2 = await fetch(`/ml-recommend/${email}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    const res2 = await fetch(`/ml-recommend/${email}`);
     const response = await res2.json();
     const data = response.results || [];
     const summary = response.summary || 'No insights available.';

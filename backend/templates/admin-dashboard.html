@@ -94,16 +94,9 @@
   </div>
 
   <script>
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/login';
-    }
-
+    // Tokens removed — requests are public in this deployment
     function authHeaders() {
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      };
+      return { 'Content-Type': 'application/json' };
     }
 
     function showMessage(el, msg, isError = false) {
