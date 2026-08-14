@@ -189,6 +189,14 @@ def ml_recommend(email):
             current = rec["current_gpa"]
             improved = rec["improved_gpa"]
 
+            # derive risk band: high / medium / low
+            if current < 2.5:
+                risk_level = "high"
+            elif current < 3.5:
+                risk_level = "medium"
+            else:
+                risk_level = "low"
+
             results.append({
                 "course": c.course_code or "Unknown",
                 "current_gpa": current,
@@ -200,7 +208,7 @@ def ml_recommend(email):
                 "confidence": rec.get("confidence", 0),
                 "why": rec.get("explanations", []),
                 "peer_insight": peer_message,
-                "risk": "high" if current < 2 else "low"
+                "risk": risk_level
             })
 
     summary = generate_ai_summary(results)
