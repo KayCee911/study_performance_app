@@ -45,7 +45,7 @@ def create_app():
     # =========================
     @app.route("/")
     def home():
-        return render_template("upload.html")
+        return render_template("login.html")
 
     @app.route("/dashboard")
     def dashboard():
