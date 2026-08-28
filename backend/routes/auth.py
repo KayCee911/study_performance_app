@@ -1,9 +1,8 @@
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from models import db, User
 from utils.validators import is_valid_email
 from utils.tokens import generate_reset_token, verify_reset_token
-
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_login import login_user, logout_user, login_required, current_user
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -34,7 +33,7 @@ def upload_survey_page():
 
 @auth_bp.route("/add-course", methods=["GET"])
 def add_course_page():
-    # ✅ Page is public, but JS will use JWT token to fetch data & submit forms
+    # Page is public; client will call public API endpoints
     return render_template("add-course.html")
 
 # =========================
@@ -83,12 +82,16 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    token = create_access_token(identity=user.email)
+    # Log the user in using Flask-Login
+    login_user(user)
+    return jsonify({"message": "Login successful", "email": user.email})
 
-    return jsonify({
-        "message": "Login successful",
-        "token": token
-    })
+
+@auth_bp.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"message": "Logged out"})
 
 
 # =========================

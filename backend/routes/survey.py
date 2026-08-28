@@ -6,7 +6,7 @@ from ml.recommender_engine import optimize_recommendation, generate_ai_summary
 from ml.similarity import get_similar_students
 from ml.retrain import retrain_model
 from ml.auto_retrain import should_retrain
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import current_app
 from math import sqrt
 import os
 
@@ -104,14 +104,8 @@ def upload_survey():
 # USER INSIGHTS (PROTECTED)
 # ===============================
 @survey_bp.route("/user/<email>/insights", methods=["GET"])
-@jwt_required()
 def user_insights(email):
-    # ✅ PROTECTED: Verify user can only access their own data
-    authenticated_email = get_jwt_identity()
-    
-    if authenticated_email != email:
-        return jsonify({"error": "Unauthorized - cannot access other users' data"}), 403
-
+    # Public endpoint: return insights for the requested email
     user = User.query.filter_by(email=email).first()
 
     if not user:
@@ -150,14 +144,8 @@ def user_insights(email):
 # ML RECOMMEND (PROTECTED)
 # ===============================
 @survey_bp.route("/ml-recommend/<email>", methods=["GET"])
-@jwt_required()
 def ml_recommend(email):
-    # ✅ PROTECTED: Verify user can only access their own recommendations
-    authenticated_email = get_jwt_identity()
-    
-    if authenticated_email != email:
-        return jsonify({"error": "Unauthorized - cannot access other users' recommendations"}), 403
-
+    # Public endpoint: return recommendations for the requested email
     user = User.query.filter_by(email=email).first()
 
     if not user:
@@ -223,11 +211,10 @@ def ml_recommend(email):
 # ADD COURSE MANUALLY WITH PREDICTIONS
 # ===============================
 @survey_bp.route("/add-course", methods=["POST"])
-@jwt_required()
 def add_course():
     """
     Add a course manually for a user and generate ML predictions.
-    
+
     Request body:
     {
         "course_code": "CSC101",
@@ -239,10 +226,16 @@ def add_course():
     }
     """
     try:
-        # Get user email from JWT token
-        user_email = get_jwt_identity()
+        # Determine which user the course belongs to: prefer explicit `email` in body
+        data_preview = request.get_json(silent=True) or {}
+        user_email = data_preview.get('email') or data_preview.get('username')
+        if not user_email:
+            # fall back to first user in DB
+            u = User.query.first()
+            user_email = u.email if u else None
+
         user = User.query.filter_by(email=user_email).first()
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
         
@@ -422,18 +415,18 @@ def add_course():
 # GET USER SEMESTERS
 # ===============================
 @survey_bp.route("/api/semesters", methods=["GET"])
-@jwt_required()
 def get_semesters():
-    """Get all semesters for the authenticated user."""
+    """Get all semesters for the requested user (public endpoint)."""
     try:
-        user_email = get_jwt_identity()
+        user_email = request.args.get('email') or (User.query.first().email if User.query.first() else None)
+
         user = User.query.filter_by(email=user_email).first()
-        
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-        
+
         semesters = Semester.query.filter_by(user_id=user.id).all()
-        
+
         return jsonify({
             "semesters": [
                 {"id": s.id, "name": s.name}

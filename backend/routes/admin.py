@@ -1,32 +1,33 @@
 from flask import Blueprint, jsonify, request, render_template
 from models import db, User, Semester, Course, StudentProfile
+from flask_login import login_required, current_user
 from utils.validators import is_valid_email
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import current_app
 
 admin_bp = Blueprint("admin", __name__)
 
 
 def get_current_admin():
-    current_email = get_jwt_identity()
-    if not current_email:
-        return None
-    return User.query.filter_by(email=current_email).first()
+    # Only the logged-in user who has `is_admin=True` is considered an admin
+    if current_user and getattr(current_user, 'is_authenticated', False) and getattr(current_user, 'is_admin', False):
+        return current_user
+    return None
 
 
 @admin_bp.route("/admin/dashboard", methods=["GET"])
-@jwt_required()
+@login_required
 def admin_dashboard():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
     return render_template("admin-dashboard.html")
 
 
 @admin_bp.route("/admin/users", methods=["GET"])
-@jwt_required()
+@login_required
 def list_users():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     users = User.query.order_by(User.created_at.desc()).all()
@@ -42,10 +43,10 @@ def list_users():
 
 
 @admin_bp.route("/admin/users", methods=["POST"])
-@jwt_required()
+@login_required
 def create_user():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     data = request.get_json(silent=True) or {}
@@ -77,10 +78,10 @@ def create_user():
 
 
 @admin_bp.route("/admin/users/<int:user_id>", methods=["DELETE"])
-@jwt_required()
+@login_required
 def delete_user(user_id):
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     user = User.query.get(user_id)
@@ -97,10 +98,10 @@ def delete_user(user_id):
 
 
 @admin_bp.route("/admin/semesters", methods=["GET"])
-@jwt_required()
+@login_required
 def list_semesters():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     semesters = Semester.query.order_by(Semester.id.desc()).all()
@@ -111,10 +112,10 @@ def list_semesters():
 
 
 @admin_bp.route("/admin/courses", methods=["GET"])
-@jwt_required()
+@login_required
 def list_courses():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     courses = Course.query.order_by(Course.id.desc()).all()
@@ -131,10 +132,10 @@ def list_courses():
 
 
 @admin_bp.route("/admin/courses", methods=["POST"])
-@jwt_required()
+@login_required
 def add_course():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     data = request.get_json(silent=True) or {}
@@ -163,10 +164,10 @@ def add_course():
 
 
 @admin_bp.route("/admin/students", methods=["GET"])
-@jwt_required()
+@login_required
 def list_students_data():
     current_admin = get_current_admin()
-    if not current_admin or not current_admin.is_admin:
+    if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
     profiles = (
