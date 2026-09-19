@@ -1,4 +1,4 @@
-﻿// Tokens removed â€” requests are public in this deployment
+﻿// Requests are public in this deployment.
     async function logout() {
       try {
         const response = await fetch('/logout', { method: 'POST' });
@@ -81,13 +81,12 @@
       e.preventDefault();
       const email = document.getElementById('user-email').value;
       const password = document.getElementById('user-password').value;
-      const is_admin = document.getElementById('user-role').value === 'true';
       const msg = document.getElementById('user-message');
 
       try {
         await fetchJson('/admin/users', {
           method: 'POST',
-          body: JSON.stringify({ email, password, is_admin })
+          body: JSON.stringify({ email, password })
         });
         showMessage(msg, 'User created successfully');
         document.getElementById('create-user-form').reset();

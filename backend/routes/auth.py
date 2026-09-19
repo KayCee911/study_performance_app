@@ -1,10 +1,13 @@
+import os
+
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
-from models import db, User
+from models import db, User, StudentProfile
 from utils.validators import is_valid_email
 from utils.tokens import generate_reset_token, verify_reset_token
 from flask_login import login_user, logout_user, login_required, current_user
 
 auth_bp = Blueprint("auth", __name__)
+DEFAULT_TRUSTED_ADMIN_EMAIL = "admin@local.test"
 
 
 
@@ -62,6 +65,18 @@ def register():
     user.set_password(password)
 
     db.session.add(user)
+    db.session.flush()
+
+    if not user.profile:
+        student_profile = StudentProfile(
+            user_id=user.id,
+            username=email.split('@')[0],
+            student_id_code=f"STD-{user.id:05d}",
+            department=None,
+            level=None,
+        )
+        db.session.add(student_profile)
+
     db.session.commit()
 
     return jsonify({"message": "User registered successfully"})
@@ -74,17 +89,25 @@ def register():
 def login():
 
     data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
+    email = ((data or {}).get("email") or "").strip().lower()
+    password = (data or {}).get("password")
 
     user = User.query.filter_by(email=email).first()
 
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    # Log the user in using Flask-Login
+    trusted_email = (os.getenv("ADMIN_EMAIL") or DEFAULT_TRUSTED_ADMIN_EMAIL).strip().lower()
+    if user.email.lower() == trusted_email:
+        user.is_admin = True
+        db.session.commit()
+
     login_user(user)
-    return jsonify({"message": "Login successful", "email": user.email})
+    return jsonify({
+        "message": "Login successful",
+        "email": user.email,
+        "is_admin": bool(user.is_admin)
+    })
 
 
 @auth_bp.route('/logout', methods=['POST'])

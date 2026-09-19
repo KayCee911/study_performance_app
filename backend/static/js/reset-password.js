@@ -35,7 +35,7 @@ async function reset() {
     });
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = data.message || 'Password updated! Redirecting to loginâ€¦';
+      msg.textContent = data.message || 'Password updated! Redirecting to login...';
       msg.classList.add('success');
       setTimeout(() => window.location.href = '/login', 1500);
     } else {

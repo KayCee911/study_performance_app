@@ -11,9 +11,10 @@
     });
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = 'Login successful! Redirectingâ€¦';
+      msg.textContent = 'Login successful! Redirecting…';
       msg.classList.add('success');
-      setTimeout(() => window.location.href = '/dashboard', 1200);
+      const targetUrl = data.is_admin ? '/admin/dashboard' : '/dashboard';
+      setTimeout(() => window.location.href = targetUrl, 1200);
     } else {
       msg.textContent = data.error || 'Something went wrong. Try again.';
       msg.classList.add('error');

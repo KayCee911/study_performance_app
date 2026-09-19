@@ -22,7 +22,7 @@ async function register() {
     });
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = data.message || 'Account created! Redirecting to loginâ€¦';
+      msg.textContent = data.message || 'Account created! Redirecting to login...';
       msg.classList.add('success');
       setTimeout(() => window.location.href = '/login', 1500);
     } else {

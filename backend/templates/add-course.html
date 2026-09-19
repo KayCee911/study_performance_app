@@ -1,9 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Add Course â€” EduPortal{% endblock %}
+{% block title %}Add Course — EduPortal{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/add-course.css') }}">
 {% endblock %}
 {% block body %}
+<script>
+  window.currentUserEmail = {{ (current_user.email if current_user.is_authenticated else '')|tojson }};
+</script>
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="grid-bg"></div>
@@ -135,22 +138,22 @@
                 <div class="pred-grid">
                     <div class="pred-item">
                         <div class="pred-label">Current Projected GPA</div>
-                        <div class="pred-value" id="currentGPA">â€”</div>
+                        <div class="pred-value" id="currentGPA">—</div>
                     </div>
                     <div class="pred-item">
                         <div class="pred-label">Optimal Projected GPA</div>
-                        <div class="pred-value secondary" id="projectedGPA">â€”</div>
+                        <div class="pred-value secondary" id="projectedGPA">—</div>
                     </div>
                 </div>
                 
                 <div class="pred-grid">
                     <div class="pred-item">
                         <div class="pred-label">Recommended Study Hours</div>
-                        <div class="pred-value" id="recommendedHours">â€”</div>
+                        <div class="pred-value" id="recommendedHours">—</div>
                     </div>
                     <div class="pred-item">
                         <div class="pred-label">Study Method</div>
-                        <div class="pred-value" id="recommendedMethod">â€”</div>
+                        <div class="pred-value" id="recommendedMethod">—</div>
                     </div>
                 </div>
                 
@@ -164,7 +167,7 @@
                 </div>
                 
                 <div class="pred-actions">
-                    <button class="pred-action-btn" onclick="window.location.href='/dashboard'">â† Back to Dashboard</button>
+                    <button class="pred-action-btn" onclick="window.location.href='/dashboard'">Back to Dashboard</button>
                     <button class="pred-action-btn primary" onclick="addAnother()">+ Add Another</button>
                 </div>
             </div>

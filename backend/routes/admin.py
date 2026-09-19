@@ -1,3 +1,5 @@
+import os
+
 from flask import Blueprint, jsonify, request, render_template
 from models import db, User, Semester, Course, StudentProfile
 from flask_login import login_required, current_user
@@ -6,11 +8,21 @@ from flask import current_app
 
 admin_bp = Blueprint("admin", __name__)
 
+DEFAULT_TRUSTED_ADMIN_EMAIL = "admin@local.test"
+TRUSTED_ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or DEFAULT_TRUSTED_ADMIN_EMAIL).strip().lower()
+
 
 def get_current_admin():
-    # Only the logged-in user who has `is_admin=True` is considered an admin
-    if current_user and getattr(current_user, 'is_authenticated', False) and getattr(current_user, 'is_admin', False):
+    if not current_user or not getattr(current_user, 'is_authenticated', False):
+        return None
+
+    if not getattr(current_user, 'is_admin', False):
+        return None
+
+    trusted_email = (os.getenv("ADMIN_EMAIL") or DEFAULT_TRUSTED_ADMIN_EMAIL).strip().lower()
+    if current_user.email and current_user.email.lower() == trusted_email:
         return current_user
+
     return None
 
 
@@ -52,7 +64,6 @@ def create_user():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
-    is_admin = bool(data.get("is_admin", False))
 
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
@@ -66,7 +77,7 @@ def create_user():
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "User already exists"}), 400
 
-    user = User(email=email, is_admin=is_admin)
+    user = User(email=email, is_admin=False)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -170,23 +181,20 @@ def list_students_data():
     if not current_admin:
         return jsonify({"error": "Admin access required"}), 403
 
-    profiles = (
-        db.session.query(StudentProfile, User)
-        .join(User, StudentProfile.user_id == User.id)
-        .all()
-    )
-
+    users = User.query.filter_by(is_admin=False).order_by(User.created_at.desc()).all()
     result = []
-    for profile, user in profiles:
+
+    for user in users:
+        profile = user.profile
         result.append(
             {
-                "student_id": profile.id,
+                "student_id": profile.id if profile else user.id,
                 "email": user.email,
-                "username": profile.username,
-                "student_id_code": profile.student_id_code,
-                "department": profile.department,
-                "level": profile.level,
-                "created_at": profile.created_at.isoformat() if profile.created_at else None,
+                "username": profile.username if profile and profile.username else (user.email.split('@')[0] if user.email else None),
+                "student_id_code": profile.student_id_code if profile else None,
+                "department": profile.department if profile else None,
+                "level": profile.level if profile else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
             }
         )
 

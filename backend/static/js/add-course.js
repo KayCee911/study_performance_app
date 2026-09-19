@@ -3,7 +3,7 @@
         
         // Initialize form
         async function initializeForm() {
-            // Tokens removed â€” the add-course page is public. Identify user via form or default.
+            // The add-course page is public. Identify the user via the form or default.
             
             await loadSemesters();
         }
@@ -89,19 +89,25 @@
             submitBtn.disabled = true;
             
             try {
+                const payload = {
+                    course_code: courseCode,
+                    course_name: courseName,
+                    unit: parseInt(unit),
+                    difficulty: parseInt(difficulty),
+                    semester_id: semester === 'new' ? null : parseInt(semester, 10),
+                    semester_name: semester === 'new' ? semesterName : null,
+                    study_hours: studyHours ? parseFloat(studyHours) : null,
+                    study_method: studyMethod || 'Passive'
+                };
+
+                if (window.currentUserEmail) {
+                    payload.email = window.currentUserEmail;
+                }
+
                 const response = await fetch('/add-course', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        course_code: courseCode,
-                        course_name: courseName,
-                        unit: parseInt(unit),
-                        difficulty: parseInt(difficulty),
-                        semester_id: semester === 'new' ? null : parseInt(semester, 10),
-                        semester_name: semester === 'new' ? semesterName : null,
-                        study_hours: studyHours ? parseFloat(studyHours) : null,
-                        study_method: studyMethod || 'Passive'
-                    })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
@@ -113,7 +119,7 @@
                     return;
                 }
                 
-                // âœ… Display predictions
+                // Display predictions
                 displayPredictions(data);
                 
             } catch (error) {
@@ -153,7 +159,7 @@
             document.getElementById('predictionResult').classList.add('show');
             
             // Show success message
-            showAlert(`âœ“ ${data.course.code} added! Predictions generated.`, 'success');
+            showAlert(`${data.course.code} added! Predictions generated.`, 'success');
         }
         
         // Add another course

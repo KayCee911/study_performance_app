@@ -1,18 +1,28 @@
+import os
+
 from app import create_app
 from extensions import db
 from models import User
 
 app = create_app()
 
+DEFAULT_ADMIN_EMAIL = "admin@local.test"
+DEFAULT_ADMIN_PASSWORD = "Secret123"
+
+admin_email = (os.getenv("ADMIN_EMAIL") or DEFAULT_ADMIN_EMAIL).strip().lower()
+admin_password = os.getenv("ADMIN_PASSWORD") or DEFAULT_ADMIN_PASSWORD
+
 with app.app_context():
-    # create tables if missing (safe in dev)
     db.create_all()
 
-    admin = User.query.filter_by(email='admin@example.com').first()
+    admin = User.query.filter_by(email=admin_email).first()
     if not admin:
-        admin = User(email='admin@example.com', is_admin=True)
-        admin.set_password('adminpass')
+        admin = User(email=admin_email, is_admin=True)
+        admin.set_password(admin_password)
         db.session.add(admin)
-        db.session.commit()
+    else:
+        admin.is_admin = True
+        admin.set_password(admin_password)
 
-    print('Admin ready: email=admin@example.com password=adminpass')
+    db.session.commit()
+    print(f"Admin ready: email={admin.email}")

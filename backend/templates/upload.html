@@ -1,5 +1,5 @@
 ﻿{% extends "base.html" %}
-{% block title %}Upload Survey â€” EduPortal{% endblock %}
+{% block title %}Upload Survey — EduPortal{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
 {% endblock %}
@@ -40,10 +40,10 @@
         </svg>
       </div>
       <div class="file-info">
-        <div class="file-name" id="fileName">â€”</div>
-        <div class="file-size" id="fileSize">â€”</div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-size" id="fileSize">—</div>
       </div>
-      <span class="file-remove" onclick="removeFile()" title="Remove file">Ã—</span>
+      <span class="file-remove" onclick="removeFile()" title="Remove file">×</span>
     </div>
 
     <div class="info-box">
@@ -60,7 +60,7 @@
     <button class="btn" id="uploadBtn" onclick="upload()" disabled>Upload survey</button>
 
     <div class="progress-wrap" id="progressWrap">
-      <div class="progress-label"><span>Uploadingâ€¦</span><span id="pct">0%</span></div>
+      <div class="progress-label"><span>Uploading...</span><span id="pct">0%</span></div>
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
 

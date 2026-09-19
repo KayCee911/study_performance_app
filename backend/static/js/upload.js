@@ -92,7 +92,7 @@ async function upload() {
           </div>`;
       }
 
-      msg.innerHTML = `${data.message || 'Upload successful! Redirecting to dashboardâ€¦'}${feedbackHtml}`;
+      msg.innerHTML = `${data.message || 'Upload successful! Redirecting to dashboard...'}${feedbackHtml}`;
       msg.classList.add('success');
       setTimeout(() => window.location.href = '/dashboard', 1500);
     } else {

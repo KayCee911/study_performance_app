@@ -87,6 +87,40 @@ class AddCourseSemesterTest(unittest.TestCase):
         payload = response.get_json()
         self.assertGreaterEqual(len(payload['results']), 1)
 
+    def test_logged_in_user_course_is_linked_to_current_user(self):
+        other_user = User(email='other@example.com')
+        other_user.set_password('secret')
+        db.session.add(other_user)
+        db.session.commit()
+
+        login_response = self.client.post(
+            '/login',
+            json={'email': 'semester@example.com', 'password': 'secret'}
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        response = self.client.post(
+            '/add-course',
+            json={
+                'course_code': 'CSC777',
+                'course_name': 'Applied Programming',
+                'unit': 3,
+                'difficulty': 2,
+                'study_hours': 4.0,
+                'study_method': 'Active'
+            }
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+        self_user = User.query.filter_by(email='semester@example.com').first()
+        created_courses = [
+            course for semester in self_user.semesters
+            for course in semester.courses
+        ]
+        self.assertEqual(len(created_courses), 1)
+        self.assertEqual(created_courses[0].course_code, 'CSC777')
+
 
 if __name__ == '__main__':
     unittest.main()

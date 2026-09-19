@@ -3,6 +3,8 @@ from extensions import db
 
 app = create_app()
 
+print(f"Using database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+
 with app.app_context():
     db.create_all()
     print("Database tables created successfully!")

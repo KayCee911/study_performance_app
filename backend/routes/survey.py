@@ -1,5 +1,6 @@
 import pandas as pd
 from flask import Blueprint, request, jsonify
+from flask_login import current_user
 from models import db, User, Semester, Course, StudyHabit, Performance, StudentProfile
 from data_processing.transform_survey import transform_survey_data
 from ml.recommender_engine import optimize_recommendation, generate_ai_summary
@@ -226,18 +227,17 @@ def add_course():
     }
     """
     try:
-        # Determine which user the course belongs to: prefer explicit `email` in body
-        data_preview = request.get_json(silent=True) or {}
-        user_email = data_preview.get('email') or data_preview.get('username')
-        if not user_email:
-            # fall back to first user in DB
-            u = User.query.first()
-            user_email = u.email if u else None
-
-        user = User.query.filter_by(email=user_email).first()
+        # Determine which user the course belongs to.
+        # Prefer the logged-in user, then explicit email in the payload, then the requested username.
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            user = current_user
+        else:
+            data_preview = request.get_json(silent=True) or {}
+            user_email = data_preview.get('email') or data_preview.get('username')
+            user = User.query.filter_by(email=user_email).first() if user_email else None
 
         if not user:
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found. Please log in or provide a valid email."}), 404
         
         # Get request data
         data = request.get_json()
@@ -418,9 +418,12 @@ def add_course():
 def get_semesters():
     """Get all semesters for the requested user (public endpoint)."""
     try:
-        user_email = request.args.get('email') or (User.query.first().email if User.query.first() else None)
+        user_email = request.args.get('email')
 
-        user = User.query.filter_by(email=user_email).first()
+        if current_user and getattr(current_user, 'is_authenticated', False):
+            user = current_user
+        else:
+            user = User.query.filter_by(email=user_email).first() if user_email else None
 
         if not user:
             return jsonify({"error": "User not found"}), 404
