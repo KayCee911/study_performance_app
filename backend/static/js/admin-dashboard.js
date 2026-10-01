@@ -81,12 +81,13 @@
       e.preventDefault();
       const email = document.getElementById('user-email').value;
       const password = document.getElementById('user-password').value;
+      const isAdmin = document.getElementById('user-role').value === 'admin';
       const msg = document.getElementById('user-message');
 
       try {
         await fetchJson('/admin/users', {
           method: 'POST',
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password, is_admin: isAdmin })
         });
         showMessage(msg, 'User created successfully');
         document.getElementById('create-user-form').reset();

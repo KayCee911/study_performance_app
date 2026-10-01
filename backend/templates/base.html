@@ -10,5 +10,6 @@
 <body{% block body_attributes %}{% endblock %}>
   {% block body %}{% endblock %}
   {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/mobile-nav.js') }}" defer></script>
 </body>
 </html>

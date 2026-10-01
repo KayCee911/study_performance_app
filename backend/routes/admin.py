@@ -1,29 +1,15 @@
-import os
-
 from flask import Blueprint, jsonify, request, render_template
 from models import db, User, Semester, Course, StudentProfile
 from flask_login import login_required, current_user
 from utils.validators import is_valid_email
-from flask import current_app
 
 admin_bp = Blueprint("admin", __name__)
-
-DEFAULT_TRUSTED_ADMIN_EMAIL = "admin@local.test"
-TRUSTED_ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or DEFAULT_TRUSTED_ADMIN_EMAIL).strip().lower()
-
 
 def get_current_admin():
     if not current_user or not getattr(current_user, 'is_authenticated', False):
         return None
 
-    if not getattr(current_user, 'is_admin', False):
-        return None
-
-    trusted_email = (os.getenv("ADMIN_EMAIL") or DEFAULT_TRUSTED_ADMIN_EMAIL).strip().lower()
-    if current_user.email and current_user.email.lower() == trusted_email:
-        return current_user
-
-    return None
+    return current_user if getattr(current_user, 'is_admin', False) else None
 
 
 @admin_bp.route("/admin/dashboard", methods=["GET"])
@@ -64,6 +50,7 @@ def create_user():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
+    is_admin = data.get("is_admin", False)
 
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
@@ -74,10 +61,13 @@ def create_user():
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
+    if not isinstance(is_admin, bool):
+        return jsonify({"error": "is_admin must be a boolean"}), 400
+
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "User already exists"}), 400
 
-    user = User(email=email, is_admin=False)
+    user = User(email=email, is_admin=is_admin)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()

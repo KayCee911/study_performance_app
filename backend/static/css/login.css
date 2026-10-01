@@ -10,7 +10,7 @@ body {
   font-family: 'Sora', sans-serif;
   background: var(--bg); color: var(--text);
   min-height: 100vh; display: flex;
-  align-items: center; justify-content: center; overflow: hidden;
+  align-items: center; justify-content: center; overflow-x: hidden; overflow-y: auto;
 }
 .orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; animation: drift 18s ease-in-out infinite; }
 .orb-1 { width: 400px; height: 400px; background: rgba(0,210,170,0.06); top: -100px; right: -80px; }
